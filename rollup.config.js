@@ -4,7 +4,7 @@ const config = {
     {
       file: "dist/index.umd.js",
       format: "umd",
-      name: "Alphablocks",
+      name: "AlphaBlocks",
     },
     {
       file: `dist/index.cjs.js`,
