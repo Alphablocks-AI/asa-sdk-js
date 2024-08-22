@@ -1,0 +1,27 @@
+{
+  "name": "asa-sdk",
+  "version": "0.0.1",
+  "description": "This is a library for asa widget",
+  "main": "dist/index.mjs",
+  "module": "dist/index.cjs.js",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "rollup --config",
+    "lint": "eslint src/index.ts",
+    "prettier": "prettier . --check",
+    "prettier:fix": "prettier . --write"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/node": "^22.4.1",
+    "eslint": "^9.9.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.2.0"
+  },
+  "dependencies": {
+    "rollup": "^4.21.0"
+  }
+}
