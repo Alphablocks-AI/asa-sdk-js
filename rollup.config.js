@@ -1,3 +1,6 @@
+import typescript from "@rollup/plugin-typescript";
+import copy from "rollup-plugin-copy";
+
 const config = {
   input: "src/index.ts",
   output: [
@@ -16,6 +19,12 @@ const config = {
       format: "es",
       sourcemap: true,
     },
+  ],
+  plugins: [
+    typescript(),
+    copy({
+      targets: [{ src: "src/styles.css", dest: "dist" }],
+    }),
   ],
 };
 
