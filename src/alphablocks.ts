@@ -1,4 +1,6 @@
-import { AlphaBlocksConstructor } from "./types";
+import { AlphaBlocksConstructor, IFrameDimensions } from "./types.ts";
+// eslint-disable-next-line no-undef
+export const CHATBOT_URL = process.env.SDK_URL as string;
 
 function getElement(container: string | HTMLElement) {
   if (typeof container === "string") {
@@ -26,11 +28,60 @@ function getAssistantHTML(
 
 function createIFrame(token: string) {
   const iframe = document.createElement("iframe");
-  iframe.src = `http://localhost:3002/?token=${token}&version=2`;
-  iframe.style.width = "570px";
-  iframe.style.height = "420px";
+  iframe.src = `${CHATBOT_URL}/?token=${token}&version=2`;
+  iframe.style.width = "562px";
+  iframe.style.height = "52px";
   iframe.style.border = "none";
+  // iframe.style.backgroundColor = "white";
   return iframe;
+}
+
+function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null) {
+  const message = {
+    type: "alphablocks-original-size",
+    data: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    },
+  };
+  if (!iframe || !iframe.contentWindow) return;
+  iframe.contentWindow.postMessage(message, CHATBOT_URL);
+}
+
+function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement | null) {
+  if (!iframe || !properties.height || !properties.width) return;
+  iframe.style.height = properties.height;
+  iframe.style.width = properties.width;
+}
+
+function hideIframe(iframe: HTMLIFrameElement | null) {
+  if (!iframe) return;
+  iframe.style.display = "none";
+  const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
+  if (!chatIconContainer) return;
+  chatIconContainer.style.display = "flex";
+}
+
+function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameElement | null) {
+  if (!type) return;
+  console.log({ type, data }, "event data>>>>>>>>>");
+  switch (type) {
+    case "alphablocks-resize": {
+      setIframeSize(data, iframe);
+      break;
+    }
+    case "alphablocks-request-original-size": {
+      sendOriginalWindowMessage(iframe);
+      break;
+    }
+    case "alphablocks-hide-iframe": {
+      hideIframe(iframe);
+      break;
+    }
+    default: {
+      break;
+    }
+  }
 }
 
 export class AlphaBlocks {
@@ -39,6 +90,7 @@ export class AlphaBlocks {
   assistantAvatar: string;
   assistantColor: string;
   assistantTextColor: string;
+  iframe: HTMLIFrameElement | null = null;
 
   constructor({ token, name, avatar, bgColor, textColor }: AlphaBlocksConstructor) {
     this.token = token;
@@ -46,6 +98,9 @@ export class AlphaBlocks {
     this.assistantAvatar = avatar;
     this.assistantColor = bgColor;
     this.assistantTextColor = textColor;
+    window.addEventListener("message", (event) => {
+      handleEvents(event.data.type, event.data.data, this.iframe);
+    });
   }
 
   renderPill(
@@ -81,6 +136,9 @@ export class AlphaBlocks {
     if (chatIconContainer) {
       chatIconContainer.style.display = "none";
     }
+    const iframe = this.iframe;
+    if (!iframe) return;
+    iframe.style.display = "block";
   }
 
   showAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
@@ -89,6 +147,7 @@ export class AlphaBlocks {
     if (!iframe) {
       const iframe = createIFrame(this.token);
       element.appendChild(iframe);
+      this.iframe = iframe;
       return;
     }
     iframe.style.display = "block";
@@ -97,6 +156,7 @@ export class AlphaBlocks {
   preRenderAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
     const iframe = createIFrame(this.token);
     iframe.style.display = "none";
+    this.iframe = iframe;
     const element = getElement(assistantContainer);
     element.appendChild(iframe);
   }

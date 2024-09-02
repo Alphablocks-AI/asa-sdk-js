@@ -5,3 +5,13 @@ export type AlphaBlocksConstructor = {
   bgColor: string;
   textColor: string;
 };
+
+export type HandleEventProps = {
+  type: string;
+  data: IFrameDimensions;
+};
+
+export type IFrameDimensions = {
+  width?: string;
+  height?: string;
+};

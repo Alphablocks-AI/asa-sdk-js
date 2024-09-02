@@ -16,7 +16,7 @@
   position: relative;
   z-index: 0;
   overflow: hidden;
-
+  font-family: sans-serif;
   &::before {
     content: "";
     position: absolute;
@@ -52,6 +52,13 @@
   }
 }
 
+@media (max-width: 1024px) {
+  #alphablocks-chat-icon-container {
+    border-radius: 100%;
+    padding: 1.6px;
+  }
+}
+
 .alphablocks-chat-icon-btn {
   background: white;
   width: 100%;
@@ -67,6 +74,13 @@
   cursor: pointer;
 }
 
+@media (max-width: 1024px) {
+  .alphablocks-chat-icon-btn {
+    border-radius: 100%;
+    padding: 8px;
+  }
+}
+
 .alphablocks-chat-icon-name {
   color: var(--shark);
   font-size: 14px;
@@ -74,7 +88,20 @@
   margin: 0;
 }
 
+@media (max-width: 1024px) {
+  .alphablocks-chat-icon-name {
+    display: none;
+  }
+}
+
 .alphablocks-chat-icon-avatar {
   height: 16px;
   width: 16px;
+}
+
+@media (max-width: 1024px) {
+  .alphablocks-chat-icon-avatar {
+    height: 22px;
+    width: 22px;
+  }
 }

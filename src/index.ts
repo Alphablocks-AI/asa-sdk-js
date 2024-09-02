@@ -1,2 +1,2 @@
-import { AlphaBlocks } from "./alphablocks";
+import { AlphaBlocks } from "./alphablocks.ts";
 export default AlphaBlocks;
