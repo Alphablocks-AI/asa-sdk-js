@@ -1,17 +1,20 @@
 {
   "compilerOptions": {
     "target": "ES6",
-    "module": "ESNext",
+    "module": "NodeNext",
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
+    "moduleResolution": "NodeNext",
     "skipLibCheck": true,
     "lib": ["DOM"],
+    "types": ["node", "jest", "@testing-library/jest-dom"],
     "noEmit": false,
     "declaration": true,
     "declarationDir": "types",
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]
