@@ -32,7 +32,6 @@ function createIFrame(token: string) {
   iframe.style.width = "562px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
-  // iframe.style.backgroundColor = "white";
   return iframe;
 }
 
@@ -59,12 +58,11 @@ function hideIframe(iframe: HTMLIFrameElement | null) {
   iframe.style.display = "none";
   const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
   if (!chatIconContainer) return;
-  chatIconContainer.style.display = "flex";
+  chatIconContainer.style.display = "block";
 }
 
 function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameElement | null) {
   if (!type) return;
-  console.log({ type, data }, "event data>>>>>>>>>");
   switch (type) {
     case "alphablocks-resize": {
       setIframeSize(data, iframe);
