@@ -155,28 +155,3 @@ export class AlphaBlocks {
     element.appendChild(iframe);
   }
 }
-
-function createEmbedContainer() {
-  const embedHTML = document.createElement("div");
-  embedHTML.setAttribute("id", "alphablocks-embed");
-  embedHTML.style.position = "fixed";
-  embedHTML.style.right = "0";
-  embedHTML.style.top = "0";
-  document.body.appendChild(embedHTML);
-}
-createEmbedContainer();
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-window.addEventListener("click", (event: any) => {
-  const btn = event.target.closest("button");
-  const asaToken = btn.getAttribute("data-asa-token");
-  if (!asaToken) return;
-  const assistant1 = new AlphaBlocks({
-    token: asaToken,
-    name: "Alphablocks AI",
-    avatar: "https://icons.duckduckgo.com/ip3/alphablocks.ai.ico",
-    bgColor: "#fff",
-    textColor: "black",
-  });
-  assistant1.showAssistant("alphablocks-embed");
-});
