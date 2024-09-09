@@ -11,12 +11,7 @@ function getElement(container: string | HTMLElement) {
   return container;
 }
 
-function getAssistantHTML(
-  name: string,
-  avatar: string,
-  bgColor: string,
-  textColor: string,
-): string {
+function getChatIconHTML(name: string, avatar: string, bgColor: string, textColor: string): string {
   return `
     <div id="alphablocks-chat-icon-container">
       <button class="alphablocks-chat-icon-btn" style="background-color:${bgColor}">
@@ -32,6 +27,7 @@ function createIFrame(token: string) {
   iframe.style.width = "562px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
+  iframe.style.zIndex = "2147480000";
   return iframe;
 }
 
@@ -113,13 +109,13 @@ export class AlphaBlocks {
     if (element.querySelector("#alphablocks-chat-icon-container")) {
       return;
     }
-    const assistantHTML = getAssistantHTML(
+    const chatIconHTML = getChatIconHTML(
       this.assistantName,
       this.assistantAvatar,
       this.assistantColor,
       this.assistantTextColor,
     );
-    element.insertAdjacentHTML("beforeend", assistantHTML);
+    element.insertAdjacentHTML("beforeend", chatIconHTML);
     const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
     if (chatIconContainer) {
       chatIconContainer.addEventListener("click", () => {
@@ -159,3 +155,28 @@ export class AlphaBlocks {
     element.appendChild(iframe);
   }
 }
+
+function createEmbedContainer() {
+  const embedHTML = document.createElement("div");
+  embedHTML.setAttribute("id", "alphablocks-embed");
+  embedHTML.style.position = "fixed";
+  embedHTML.style.right = "0";
+  embedHTML.style.top = "0";
+  document.body.appendChild(embedHTML);
+}
+createEmbedContainer();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+window.addEventListener("click", (event: any) => {
+  const btn = event.target.closest("button");
+  const asaToken = btn.getAttribute("data-asa-token");
+  if (!asaToken) return;
+  const assistant1 = new AlphaBlocks({
+    token: asaToken,
+    name: "Alphablocks AI",
+    avatar: "https://icons.duckduckgo.com/ip3/alphablocks.ai.ico",
+    bgColor: "#fff",
+    textColor: "black",
+  });
+  assistant1.showAssistant("alphablocks-embed");
+});
