@@ -27,7 +27,6 @@ function createIFrame(token: string) {
   iframe.style.width = "562px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
-  iframe.style.zIndex = "2147480000";
   return iframe;
 }
 
@@ -140,6 +139,7 @@ export class AlphaBlocks {
     const iframe = element.querySelector("iframe");
     if (!iframe) {
       const iframe = createIFrame(this.token);
+      element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
       return;
@@ -152,6 +152,7 @@ export class AlphaBlocks {
     iframe.style.display = "none";
     this.iframe = iframe;
     const element = getElement(assistantContainer);
+    element.style.zIndex = "2147480000";
     element.appendChild(iframe);
   }
 }
