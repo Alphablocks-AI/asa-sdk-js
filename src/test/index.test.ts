@@ -213,7 +213,7 @@ describe("AlphaBlocks", () => {
     document.body.innerHTML = '<div id="assistant-container"></div>';
     alphaBlocks.showAssistant("assistant-container");
     const iframe = document.querySelector("iframe");
-    expect(iframe?.style.width).toBe("562px");
+    expect(iframe?.style.width).toBe("145px");
     expect(iframe?.style.height).toBe("52px");
     window.parent.postMessage(
       {
