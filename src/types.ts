@@ -1,9 +1,9 @@
 export type AlphaBlocksConstructor = {
   token: string;
-  name: string;
-  avatar: string;
-  bgColor: string;
-  textColor: string;
+  name?: string;
+  avatar?: string;
+  bgColor?: string;
+  textColor?: string;
 };
 
 export type HandleEventProps = {
