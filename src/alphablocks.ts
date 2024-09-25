@@ -24,7 +24,7 @@ function getChatIconHTML(name: string, avatar: string, bgColor: string, textColo
 function createIFrame(token: string) {
   const iframe = document.createElement("iframe");
   iframe.src = `${CHATBOT_URL}/?token=${token}&version=2`;
-  iframe.style.width = "562px";
+  iframe.style.width = "145px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
   return iframe;
@@ -79,18 +79,18 @@ function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameEl
 
 export class AlphaBlocks {
   token: string;
-  assistantName: string;
-  assistantAvatar: string;
-  assistantColor: string;
-  assistantTextColor: string;
+  assistantName: string = "";
+  assistantAvatar: string = "";
+  assistantColor: string = "";
+  assistantTextColor: string = "";
   iframe: HTMLIFrameElement | null = null;
 
   constructor({ token, name, avatar, bgColor, textColor }: AlphaBlocksConstructor) {
     this.token = token;
-    this.assistantName = name;
-    this.assistantAvatar = avatar;
-    this.assistantColor = bgColor;
-    this.assistantTextColor = textColor;
+    this.assistantName = name || "";
+    this.assistantAvatar = avatar || "";
+    this.assistantColor = bgColor || "";
+    this.assistantTextColor = textColor || "";
     window.addEventListener("message", (event) => {
       handleEvents(event.data.type, event.data.data, this.iframe);
     });
