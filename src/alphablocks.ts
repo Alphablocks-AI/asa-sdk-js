@@ -21,10 +21,10 @@ function getChatIconHTML(name: string, avatar: string, bgColor: string, textColo
     </div>`;
 }
 
-function createIFrame(token: string) {
+function createIFrame(token: string, version: number) {
   const iframe = document.createElement("iframe");
-  iframe.src = `${CHATBOT_URL}/?token=${token}&version=2`;
-  iframe.style.width = "145px";
+  iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}`;
+  iframe.style.width = version == 1 ? "145px" : "562px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
   return iframe;
@@ -138,7 +138,20 @@ export class AlphaBlocks {
     const element = getElement(assistantContainer);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
-      const iframe = createIFrame(this.token);
+      const iframe = createIFrame(this.token, 1);
+      element.style.zIndex = "2147480000";
+      element.appendChild(iframe);
+      this.iframe = iframe;
+      return;
+    }
+    iframe.style.display = "block";
+  }
+
+  showAssistantOnBtnClick(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
+    const element = getElement(assistantContainer);
+    const iframe = element.querySelector("iframe");
+    if (!iframe) {
+      const iframe = createIFrame(this.token, 2);
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
@@ -148,7 +161,7 @@ export class AlphaBlocks {
   }
 
   preRenderAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
-    const iframe = createIFrame(this.token);
+    const iframe = createIFrame(this.token, 2);
     iframe.style.display = "none";
     this.iframe = iframe;
     const element = getElement(assistantContainer);
