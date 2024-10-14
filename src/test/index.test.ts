@@ -9,6 +9,7 @@ describe("AlphaBlocks", () => {
   function setup() {
     return new AlphaBlocks({
       token: "test-token",
+      theme: "light",
       name: "Test Assistant",
       avatar: "avatar.png",
       bgColor: "blue",
