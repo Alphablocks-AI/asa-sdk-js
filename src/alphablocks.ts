@@ -21,9 +21,9 @@ function getChatIconHTML(name: string, avatar: string, bgColor: string, textColo
     </div>`;
 }
 
-function createIFrame(token: string, version: number) {
+function createIFrame(token: string, theme: string, version: number) {
   const iframe = document.createElement("iframe");
-  iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}`;
+  iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}&theme=${theme}`;
   iframe.style.width = version == 1 ? "145px" : "562px";
   iframe.style.height = "52px";
   iframe.style.border = "none";
@@ -79,18 +79,20 @@ function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameEl
 
 export class AlphaBlocks {
   token: string;
+  assistantTheme: string = "light";
   assistantName: string = "";
   assistantAvatar: string = "";
   assistantColor: string = "";
   assistantTextColor: string = "";
   iframe: HTMLIFrameElement | null = null;
 
-  constructor({ token, name, avatar, bgColor, textColor }: AlphaBlocksConstructor) {
+  constructor({ token, name, avatar, bgColor, textColor, theme }: AlphaBlocksConstructor) {
     this.token = token;
     this.assistantName = name || "";
     this.assistantAvatar = avatar || "";
     this.assistantColor = bgColor || "";
     this.assistantTextColor = textColor || "";
+    this.assistantTheme = theme || "light";
     window.addEventListener("message", (event) => {
       handleEvents(event.data.type, event.data.data, this.iframe);
     });
@@ -138,12 +140,13 @@ export class AlphaBlocks {
     const element = getElement(assistantContainer);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
-      const iframe = createIFrame(this.token, 1);
+      const iframe = createIFrame(this.token, this.assistantTheme, 1);
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
       return;
     }
+    iframe.src = `${CHATBOT_URL}/?token=${this.token}&version=1&theme=${this.assistantTheme}`;
     iframe.style.display = "block";
   }
 
@@ -151,17 +154,18 @@ export class AlphaBlocks {
     const element = getElement(assistantContainer);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
-      const iframe = createIFrame(this.token, 2);
+      const iframe = createIFrame(this.token, this.assistantTheme, 2);
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
       return;
     }
+    iframe.src = `${CHATBOT_URL}/?token=${this.token}&version=2&theme=${this.assistantTheme}`;
     iframe.style.display = "block";
   }
 
   preRenderAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
-    const iframe = createIFrame(this.token, 2);
+    const iframe = createIFrame(this.token, this.assistantTheme, 2);
     iframe.style.display = "none";
     this.iframe = iframe;
     const element = getElement(assistantContainer);
