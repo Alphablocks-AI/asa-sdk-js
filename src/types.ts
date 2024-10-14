@@ -1,5 +1,6 @@
 export type AlphaBlocksConstructor = {
   token: string;
+  theme: string;
   name?: string;
   avatar?: string;
   bgColor?: string;
