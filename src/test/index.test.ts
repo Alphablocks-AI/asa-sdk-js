@@ -33,7 +33,7 @@ describe("AlphaBlocks", () => {
   test("should render the chat pill correctly", () => {
     const alphaBlocks = setup();
     document.body.innerHTML = '<div id="container"></div>';
-    alphaBlocks.renderPill("container", "assistant-container");
+    alphaBlocks.renderPill("container");
 
     const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
     expect(chatIconContainer).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("AlphaBlocks", () => {
     const iframeContainer = document.createElement("div");
     document.body.appendChild(pillContainer);
     document.body.appendChild(iframeContainer);
-    alphaBlocks.renderPill(pillContainer, iframeContainer);
+    alphaBlocks.renderPill(pillContainer);
 
     const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
     expect(chatIconContainer).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("AlphaBlocks", () => {
       <div id="container">
         <div id="alphablocks-chat-icon-container"></div>
       </div>`;
-    alphaBlocks.renderPill("container", "assistant-container");
+    alphaBlocks.renderPill("container");
 
     const containers = document.querySelectorAll("#alphablocks-chat-icon-container");
     expect(containers.length).toBe(1);
@@ -69,9 +69,10 @@ describe("AlphaBlocks", () => {
 
   test("should hide chat pill", () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="container"></div><div id="assistant-container"></div>';
-    alphaBlocks.renderPill("container", "assistant-container");
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML =
+      '<div id="container"></div><div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.renderPill("container");
+    alphaBlocks.showAssistant();
     alphaBlocks.hideChatPill();
 
     const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
@@ -82,9 +83,10 @@ describe("AlphaBlocks", () => {
 
   test("should trigger methods on chat pill click", () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="container"></div><div id="assistant-container"></div>';
-    alphaBlocks.renderPill("container", "assistant-container");
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML =
+      '<div id="container"></div><div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.renderPill("container");
+    alphaBlocks.showAssistant();
     const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
     if (!chatIconContainer) return;
     fireEvent.click(chatIconContainer);
@@ -93,8 +95,8 @@ describe("AlphaBlocks", () => {
 
   test("should show the assistant iframe", () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.showAssistant();
 
     const iframe = document.querySelector("iframe");
     expect(iframe).toBeInTheDocument();
@@ -103,8 +105,8 @@ describe("AlphaBlocks", () => {
 
   test("should pre-render the assistant iframe", () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.preRenderAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.preRenderAssistant();
 
     const iframe = document.querySelector("iframe");
     expect(iframe).toBeInTheDocument();
@@ -113,20 +115,20 @@ describe("AlphaBlocks", () => {
 
   test("should change display if pre render iframe present", () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.preRenderAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.preRenderAssistant();
 
     const iframe = document.querySelector("iframe");
     expect(iframe).toBeInTheDocument();
     expect(iframe?.style.display).toBe("none");
-    alphaBlocks.showAssistant("assistant-container");
+    alphaBlocks.showAssistant();
     expect(iframe?.style.display).toBe("block");
   });
 
   test("should hide iframe on alphablocks-hide-iframe event", async () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.showAssistant();
     const iframe = document.querySelector("iframe");
     expect(iframe).toBeInTheDocument();
     window.parent.postMessage(
@@ -141,9 +143,10 @@ describe("AlphaBlocks", () => {
 
   test("should show chat pill on alphablocks-hide-iframe event", async () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="container"></div><div id="assistant-container"></div>';
-    alphaBlocks.renderPill("container", "assistant-container");
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML =
+      '<div id="container"></div><div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.renderPill("container");
+    alphaBlocks.showAssistant();
     const iframe = document.querySelector("iframe");
     expect(iframe).toBeInTheDocument();
     window.parent.postMessage(
@@ -159,8 +162,9 @@ describe("AlphaBlocks", () => {
 
   test("should return on irrelevant event", async () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="container"></div><div id="assistant-container"></div>';
-    alphaBlocks.renderPill("container", "assistant-container");
+    document.body.innerHTML =
+      '<div id="container"></div><div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.renderPill("container");
     window.parent.postMessage(
       {
         type: "alphablocks_event",
@@ -178,8 +182,8 @@ describe("AlphaBlocks", () => {
   // TypeError: Cannot read properties of null (reading '_origin') in Jest
   test.skip("should send original window dimensions", async () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.showAssistant();
     const iframe = document.querySelector("iframe")!;
     // const spiedPostMsg = jest
     //   .spyOn(
@@ -211,8 +215,8 @@ describe("AlphaBlocks", () => {
 
   test("should change dimensions based on events", async () => {
     const alphaBlocks = setup();
-    document.body.innerHTML = '<div id="assistant-container"></div>';
-    alphaBlocks.showAssistant("assistant-container");
+    document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
+    alphaBlocks.showAssistant();
     const iframe = document.querySelector("iframe");
     expect(iframe?.style.width).toBe("145px");
     expect(iframe?.style.height).toBe("52px");

@@ -1,6 +1,7 @@
-import { AlphaBlocksConstructor, IFrameDimensions } from "./types.ts";
+import { AlphaBlocksConstructor, AssistantProperties, IFrameDimensions } from "./types.ts";
 // eslint-disable-next-line no-undef
 export const CHATBOT_URL = process.env.SDK_URL as string;
+export const ALPHABLOCKS_WRAPPER_ID = "alphablocks-assistant-container";
 
 function getElement(container: string | HTMLElement) {
   if (typeof container === "string") {
@@ -19,6 +20,34 @@ function getChatIconHTML(name: string, avatar: string, bgColor: string, textColo
           <p class="alphablocks-chat-icon-name" style="color:${textColor}">${name}</p>
       </button>
     </div>`;
+}
+
+function createWrapper() {
+  const wrapperDiv = document.createElement("div");
+  wrapperDiv.setAttribute("id", ALPHABLOCKS_WRAPPER_ID);
+  wrapperDiv.style.position = "fixed";
+  wrapperDiv.style.right = "32px";
+  wrapperDiv.style.bottom = "32px";
+  document.body.appendChild(wrapperDiv);
+}
+
+function updateWrapperProperties(assistantProperties: AssistantProperties) {
+  const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+  switch (assistantProperties.position) {
+    case "bottom-left": {
+      wrapperDiv.style.left = "32px";
+      return;
+    }
+    case "bottom-center": {
+      wrapperDiv.style.left = "50%";
+      wrapperDiv.style.transform = "translateX(-50%)";
+      return;
+    }
+    default: {
+      wrapperDiv.style.right = "32px";
+      return;
+    }
+  }
 }
 
 function createIFrame(token: string, theme: string, version: number) {
@@ -79,7 +108,7 @@ function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameEl
 
 export class AlphaBlocks {
   token: string;
-  assistantTheme: string = "light";
+  assistantTheme: string = "";
   assistantName: string = "";
   assistantAvatar: string = "";
   assistantColor: string = "";
@@ -92,17 +121,13 @@ export class AlphaBlocks {
     this.assistantAvatar = avatar || "";
     this.assistantColor = bgColor || "";
     this.assistantTextColor = textColor || "";
-    this.assistantTheme = theme || "light";
+    this.assistantTheme = theme || "";
     window.addEventListener("message", (event) => {
       handleEvents(event.data.type, event.data.data, this.iframe);
     });
   }
 
-  renderPill(
-    this: AlphaBlocks,
-    container: string | HTMLElement,
-    assistantContainer: string | HTMLElement,
-  ) {
+  renderPill(this: AlphaBlocks, container: string | HTMLElement) {
     if (!container) throw new Error("Please provide either id or element");
     if (!this.assistantName || !this.assistantAvatar)
       throw new Error("Please provide assistant details");
@@ -121,7 +146,7 @@ export class AlphaBlocks {
     if (chatIconContainer) {
       chatIconContainer.addEventListener("click", () => {
         this.hideChatPill();
-        this.showAssistant(assistantContainer);
+        this.showAssistant();
       });
     }
   }
@@ -136,8 +161,8 @@ export class AlphaBlocks {
     iframe.style.display = "block";
   }
 
-  showAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
-    const element = getElement(assistantContainer);
+  showAssistant() {
+    const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
       const iframe = createIFrame(this.token, this.assistantTheme, 1);
@@ -150,8 +175,20 @@ export class AlphaBlocks {
     iframe.style.display = "block";
   }
 
-  showAssistantOnBtnClick(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
-    const element = getElement(assistantContainer);
+  async renderWrapper() {
+    createWrapper();
+    const response = await fetch(
+      `https://api-prod.alphablocks.ai/api/v1/assistant/widget/assistant-details/?token=${this.token}`,
+      {
+        headers: { Authorization: "Bearer " + this.token, "Content-Type": "*" },
+      },
+    );
+    const data = await response.json();
+    updateWrapperProperties(data.data);
+  }
+
+  showAssistantOnBtnClick() {
+    const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
       const iframe = createIFrame(this.token, this.assistantTheme, 2);
@@ -164,11 +201,11 @@ export class AlphaBlocks {
     iframe.style.display = "block";
   }
 
-  preRenderAssistant(this: AlphaBlocks, assistantContainer: string | HTMLElement) {
+  preRenderAssistant() {
     const iframe = createIFrame(this.token, this.assistantTheme, 2);
     iframe.style.display = "none";
     this.iframe = iframe;
-    const element = getElement(assistantContainer);
+    const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     element.style.zIndex = "2147480000";
     element.appendChild(iframe);
   }
