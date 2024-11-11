@@ -15,6 +15,9 @@ export type HandleEventProps = {
 export type IFrameDimensions = {
   width?: string;
   height?: string;
+  bottom?: string;
+  right?: string;
+  left?: string;
 };
 
 export type AssistantProperties = {
