@@ -73,8 +73,17 @@ function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null) {
 
 function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement | null) {
   if (!iframe || !properties.height || !properties.width) return;
+  const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
   iframe.style.height = properties.height;
   iframe.style.width = properties.width;
+  wrapperDiv.style.right = "32px";
+  wrapperDiv.style.bottom = "32px";
+  wrapperDiv.style.width = "fit-content";
+  if (properties.right && properties.left && properties.bottom) {
+    wrapperDiv.style.right = properties.right;
+    wrapperDiv.style.bottom = properties.bottom;
+    wrapperDiv.style.width = "100%";
+  }
 }
 
 function hideIframe(iframe: HTMLIFrameElement | null) {
