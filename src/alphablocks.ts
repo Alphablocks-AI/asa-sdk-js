@@ -26,8 +26,8 @@ function createWrapper() {
   const wrapperDiv = document.createElement("div");
   wrapperDiv.setAttribute("id", ALPHABLOCKS_WRAPPER_ID);
   wrapperDiv.style.position = "fixed";
-  wrapperDiv.style.right = "32px";
-  wrapperDiv.style.bottom = "32px";
+  wrapperDiv.style.right = "24px";
+  wrapperDiv.style.bottom = "24px";
   document.body.appendChild(wrapperDiv);
 }
 
@@ -76,8 +76,8 @@ function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement |
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
   iframe.style.height = properties.height;
   iframe.style.width = properties.width;
-  wrapperDiv.style.right = "32px";
-  wrapperDiv.style.bottom = "32px";
+  wrapperDiv.style.right = "24px";
+  wrapperDiv.style.bottom = "24px";
   wrapperDiv.style.width = "fit-content";
   if (properties.right && properties.left && properties.bottom) {
     wrapperDiv.style.right = properties.right;
