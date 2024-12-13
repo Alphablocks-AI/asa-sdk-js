@@ -35,26 +35,27 @@ function updateWrapperProperties(assistantProperties: AssistantProperties) {
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
   switch (assistantProperties.position) {
     case "bottom-left": {
-      wrapperDiv.style.left = "32px";
-      return;
+      wrapperDiv.style.left = "24px";
+      break;
     }
     case "bottom-center": {
       wrapperDiv.style.left = "50%";
       wrapperDiv.style.transform = "translateX(-50%)";
-      return;
+      break;
     }
     default: {
-      wrapperDiv.style.right = "32px";
-      return;
+      wrapperDiv.style.right = "24px";
+      break;
     }
   }
 }
 
-function createIFrame(token: string, theme: string, version: number) {
+function createIFrame(token: string, theme: string, name: string, version: number) {
   const iframe = document.createElement("iframe");
+  const width = name.length <= 7 ? "110px" : name.length <= 15 ? "160px" : "225px";
   iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}&theme=${theme}`;
-  iframe.style.width = version == 1 ? "145px" : "562px";
-  iframe.style.height = "52px";
+  iframe.style.width = version == 1 ? width : "562px";
+  iframe.style.height = version == 1 ? "60px" : "545px";
   iframe.style.border = "none";
   return iframe;
 }
@@ -78,7 +79,6 @@ function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement |
   iframe.style.width = properties.width;
   wrapperDiv.style.right = "24px";
   wrapperDiv.style.bottom = "24px";
-  wrapperDiv.style.width = "fit-content";
   if (properties.right && properties.left && properties.bottom) {
     wrapperDiv.style.right = properties.right;
     wrapperDiv.style.bottom = properties.bottom;
@@ -174,7 +174,7 @@ export class AlphaBlocks {
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
-      const iframe = createIFrame(this.token, this.assistantTheme, 1);
+      const iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 1);
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
@@ -193,6 +193,7 @@ export class AlphaBlocks {
       },
     );
     const data = await response.json();
+    this.assistantName = data.data.name;
     updateWrapperProperties(data.data);
   }
 
@@ -200,7 +201,7 @@ export class AlphaBlocks {
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
-      const iframe = createIFrame(this.token, this.assistantTheme, 2);
+      const iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
@@ -211,7 +212,7 @@ export class AlphaBlocks {
   }
 
   preRenderAssistant() {
-    const iframe = createIFrame(this.token, this.assistantTheme, 2);
+    const iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
     iframe.style.display = "none";
     this.iframe = iframe;
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
