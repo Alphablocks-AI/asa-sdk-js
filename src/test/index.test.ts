@@ -218,8 +218,8 @@ describe("AlphaBlocks", () => {
     document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
     alphaBlocks.showAssistant();
     const iframe = document.querySelector("iframe");
-    expect(iframe?.style.width).toBe("145px");
-    expect(iframe?.style.height).toBe("52px");
+    expect(iframe?.style.width).toBe("160px");
+    expect(iframe?.style.height).toBe("60px");
     window.parent.postMessage(
       {
         type: "alphablocks-resize",
