@@ -135,7 +135,7 @@ function setCookie(name: string) {
   const expires = new Date();
   expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
   const sessionId = generateRandomString(8);
-  document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=None;Secure`;
+  document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict;Secure`;
   return sessionId;
 }
 
