@@ -2,6 +2,7 @@ export type AlphaBlocksConstructor = {
   token: string;
   theme?: string;
   name?: string;
+  id?: number;
   avatar?: string;
   bgColor?: string;
   textColor?: string;
