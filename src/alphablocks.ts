@@ -1,5 +1,4 @@
 import { AlphaBlocksConstructor, AssistantProperties, IFrameDimensions } from "./types.ts";
-import { nanoid } from "nanoid";
 // eslint-disable-next-line no-undef
 export const CHATBOT_URL = process.env.SDK_URL as string;
 export const ALPHABLOCKS_WRAPPER_ID = "alphablocks-assistant-container";
@@ -122,10 +121,20 @@ function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameEl
   }
 }
 
+function generateRandomString(length: number): string {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
+  let result = "";
+  const charactersLength = characters.length;
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
+
 function setCookie(name: string) {
   const expires = new Date();
   expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const sessionId = nanoid();
+  const sessionId = generateRandomString(8);
   document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=None;Secure`;
   return sessionId;
 }
