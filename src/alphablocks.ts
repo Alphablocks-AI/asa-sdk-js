@@ -95,7 +95,12 @@ function hideIframe(iframe: HTMLIFrameElement | null) {
   chatIconContainer.style.display = "block";
 }
 
-function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameElement | null) {
+function handleEvents(
+  type: string,
+  data: IFrameDimensions,
+  iframe: HTMLIFrameElement | null,
+  assistantId: number | null,
+) {
   if (!type) return;
   console.log(type, data, "type and data>>>>>");
   switch (type) {
@@ -112,7 +117,7 @@ function handleEvents(type: string, data: IFrameDimensions, iframe: HTMLIFrameEl
       break;
     }
     case "alphablocks-request-session-cookie": {
-      handleSessionCookie(10, iframe);
+      handleSessionCookie(assistantId as number, iframe);
       break;
     }
     default: {
@@ -135,7 +140,7 @@ function setCookie(name: string) {
   const expires = new Date();
   expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
   const sessionId = generateRandomString(8);
-  document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict;Secure`;
+  document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
   return sessionId;
 }
 
@@ -194,7 +199,7 @@ export class AlphaBlocks {
     this.assistantTheme = theme || "";
     this.assistantId = id || null;
     window.addEventListener("message", (event) => {
-      handleEvents(event.data.type, event.data.data, this.iframe);
+      handleEvents(event.data.type, event.data.data, this.iframe, this.assistantId);
     });
   }
 
@@ -257,7 +262,6 @@ export class AlphaBlocks {
     const data = await response.json();
     this.assistantName = data.data.name;
     this.assistantId = data.data.id;
-    // handleSessionCookie(data.data.id);
     updateWrapperProperties(data.data);
   }
 
