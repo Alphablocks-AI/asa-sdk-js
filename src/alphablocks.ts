@@ -52,7 +52,7 @@ function updateWrapperProperties(assistantProperties: AssistantProperties) {
 
 function createIFrame(token: string, theme: string, name: string, version: number) {
   const iframe = document.createElement("iframe");
-  const width = name.length <= 7 ? "110px" : name.length <= 15 ? "160px" : "225px";
+  const width = name.length <= 7 ? "120px" : name.length <= 15 ? "170px" : "235px";
   iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}&theme=${theme}`;
   iframe.style.width = version == 1 ? width : "562px";
   iframe.style.height = version == 1 ? "60px" : "545px";
