@@ -15,7 +15,7 @@
   "scripts": {
     "typecheck": "tsc",
     "build": "rollup --config --environment SDK_URL:https://widget-asa.alphablocks.ai",
-    "build:dev": "rollup --config --environment SDK_URL:http://localhost:3002",
+    "build:dev": "rollup --config --environment SDK_URL:https://dev-widget-asa.alphablocks.ai",
     "lint": "eslint .",
     "prettier": "prettier . --check",
     "prettier:fix": "prettier . --write",

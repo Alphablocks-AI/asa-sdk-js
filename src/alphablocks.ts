@@ -1,6 +1,7 @@
+/* eslint-disable no-undef */
 import { AlphaBlocksConstructor, AssistantProperties, IFrameDimensions } from "./types.ts";
-// eslint-disable-next-line no-undef
 export const CHATBOT_URL = process.env.SDK_URL as string;
+export const API_URL = process.env.API_URL as string;
 export const ALPHABLOCKS_WRAPPER_ID = "alphablocks-assistant-container";
 
 function getElement(container: string | HTMLElement) {
@@ -256,7 +257,7 @@ export class AlphaBlocks {
   async renderWrapper() {
     createWrapper();
     const response = await fetch(
-      `https://api-prod.alphablocks.ai/api/v1/assistant/widget/assistant-details/?token=${this.token}`,
+      `${API_URL}/assistant/widget/assistant-details/?token=${this.token}`,
       {
         headers: { Authorization: "Bearer " + this.token, "Content-Type": "*" },
       },

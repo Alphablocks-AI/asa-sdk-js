@@ -2,21 +2,29 @@ import typescript from "@rollup/plugin-typescript";
 import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
+// eslint-disable-next-line no-undef
+const isDev = process.env.SDK_URL.includes("dev-widget");
+const outputDir = isDev ? "dist-dev" : "dist";
+
+const API_URL = isDev
+  ? "https://api-staging.alphablocks.ai/api/v1"
+  : "https://api-prod.alphablocks.ai/api/v1";
+
 const config = {
   input: "src/index.ts",
   output: [
     {
-      file: "dist/index.umd.js",
+      file: `${outputDir}/index.umd.js`,
       format: "umd",
       name: "AlphaBlocks",
     },
     {
-      file: `dist/index.cjs.js`,
+      file: `${outputDir}/index.cjs.js`,
       format: "cjs",
       sourcemap: true,
     },
     {
-      file: `dist/index.mjs`,
+      file: `${outputDir}/index.mjs`,
       format: "es",
       sourcemap: true,
     },
@@ -25,6 +33,7 @@ const config = {
     replace({
       // eslint-disable-next-line no-undef
       "process.env.SDK_URL": JSON.stringify(process.env.SDK_URL),
+      "process.env.API_URL": JSON.stringify(API_URL),
     }),
     typescript(),
     copy({
