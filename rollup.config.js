@@ -1,8 +1,8 @@
+/* eslint-disable no-undef */
 import typescript from "@rollup/plugin-typescript";
 import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
-// eslint-disable-next-line no-undef
 const isDev = process.env.SDK_URL.includes("dev-widget");
 const outputDir = isDev ? "dist-dev" : "dist";
 
@@ -31,7 +31,6 @@ const config = {
   ],
   plugins: [
     replace({
-      // eslint-disable-next-line no-undef
       "process.env.SDK_URL": JSON.stringify(process.env.SDK_URL),
       "process.env.API_URL": JSON.stringify(API_URL),
     }),
