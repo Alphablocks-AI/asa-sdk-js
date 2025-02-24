@@ -6,6 +6,7 @@ export type AlphaBlocksConstructor = {
   avatar?: string;
   bgColor?: string;
   textColor?: string;
+  endUserId?: string;
 };
 
 export type HandleEventProps = {

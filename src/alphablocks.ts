@@ -103,9 +103,9 @@ function handleEvents(
   data: IFrameDimensions,
   iframe: HTMLIFrameElement | null,
   assistantId: number | null,
+  instance: AlphaBlocks,
 ) {
   if (!type) return;
-  console.log(type, data, "type and data>>>>>");
   switch (type) {
     case "alphablocks-resize": {
       setIframeSize(data, iframe);
@@ -120,7 +120,7 @@ function handleEvents(
       break;
     }
     case "alphablocks-request-session-cookie": {
-      handleSessionCookie(assistantId as number, iframe);
+      handleSessionCookie(assistantId as number, iframe, instance);
       break;
     }
     default: {
@@ -157,13 +157,18 @@ function getCookie(name: string) {
   return "";
 }
 
-function handleSessionCookie(assistantId: number, iframe: HTMLIFrameElement | null) {
+function handleSessionCookie(
+  assistantId: number,
+  iframe: HTMLIFrameElement | null,
+  instance: AlphaBlocks,
+) {
   let isExisted = true;
   let sessionCookie = getCookie(`alphablocks-sessionId-${assistantId}`);
   if (sessionCookie.length === 0) {
     isExisted = false;
     sessionCookie = setCookie(`alphablocks-sessionId-${assistantId}`);
   }
+  instance.endUserId = sessionCookie;
   sendSessionCookie(sessionCookie, iframe, isExisted);
 }
 
@@ -183,6 +188,18 @@ function sendSessionCookie(
   iframe.contentWindow.postMessage(message, CHATBOT_URL);
 }
 
+async function getEndUser(assistantId: number, endUserId: string) {
+  try {
+    const response = await fetch(
+      `${API_URL}/chat/widget/get-user/?assistant_id=${assistantId}&end_user_id=${endUserId}`,
+    );
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.log(error, "error");
+  }
+}
+
 export class AlphaBlocks {
   token: string;
   assistantTheme: string = "";
@@ -192,8 +209,17 @@ export class AlphaBlocks {
   assistantColor: string = "";
   assistantTextColor: string = "";
   iframe: HTMLIFrameElement | null = null;
-
-  constructor({ token, name, avatar, bgColor, textColor, theme, id }: AlphaBlocksConstructor) {
+  endUserId: string = "";
+  constructor({
+    token,
+    name,
+    avatar,
+    bgColor,
+    textColor,
+    theme,
+    id,
+    endUserId,
+  }: AlphaBlocksConstructor) {
     this.token = token;
     this.assistantName = name || "";
     this.assistantAvatar = avatar || "";
@@ -201,8 +227,9 @@ export class AlphaBlocks {
     this.assistantTextColor = textColor || "";
     this.assistantTheme = theme || "";
     this.assistantId = id || null;
+    this.endUserId = endUserId || "";
     window.addEventListener("message", (event) => {
-      handleEvents(event.data.type, event.data.data, this.iframe, this.assistantId);
+      handleEvents(event.data.type, event.data.data, this.iframe, this.assistantId, this);
     });
   }
 
@@ -268,7 +295,7 @@ export class AlphaBlocks {
     updateWrapperProperties(data.data);
   }
 
-  showAssistantOnBtnClick() {
+  async showAssistantOnBtnClick() {
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     const iframe = element.querySelector("iframe");
     if (!iframe) {
@@ -279,6 +306,7 @@ export class AlphaBlocks {
       return;
     }
     iframe.style.display = "block";
+    await getEndUser(this.assistantId as number, this.endUserId);
   }
 
   preRenderAssistant() {
