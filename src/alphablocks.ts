@@ -76,14 +76,19 @@ function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null) {
 function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement | null) {
   if (!iframe || !properties.height || !properties.width) return;
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
-  iframe.style.height = properties.height;
   iframe.style.width = properties.width;
+  console.log(window.innerWidth, "window.innerWidth");
+  if (window.innerWidth <= 500) {
+    iframe.style.height = window.innerHeight + "px";
+  } else {
+    iframe.style.height = properties.height;
+  }
   wrapperDiv.style.right = "24px";
   wrapperDiv.style.bottom = "24px";
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";
   if (properties.right && properties.left && properties.bottom) {
-    iframe.style.height = window.innerHeight + "px";
+    // iframe.style.height = window.innerHeight + "px";
     wrapperDiv.style.right = properties.right;
     wrapperDiv.style.bottom = properties.bottom;
     wrapperDiv.style.width = "100%";
