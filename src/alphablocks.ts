@@ -83,6 +83,7 @@ function setIframeSize(properties: IFrameDimensions, iframe: HTMLIFrameElement |
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";
   if (properties.right && properties.left && properties.bottom) {
+    iframe.style.height = window.innerHeight + "px";
     wrapperDiv.style.right = properties.right;
     wrapperDiv.style.bottom = properties.bottom;
     wrapperDiv.style.width = "100%";
