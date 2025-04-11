@@ -73,10 +73,13 @@ export function sendParentUrlParams(
   iframe: HTMLIFrameElement | null,
   assistantId: number | null,
 ): void {
-  const urlParams = new URLSearchParams(window.location.search);
-  const askAsa = urlParams.get("ask_asa") === "true";
-  const query = urlParams.get("query") || "";
+  const urlParams = new URL(window.location.href);
+  const askAsa = urlParams.searchParams.get("ask_asa") === "true";
+  const query = urlParams.searchParams.get("query") || "";
   const sessionCookie = getCookie(`alphablocks-sessionId-${assistantId}`);
+  urlParams.searchParams.delete("ask_asa");
+  urlParams.searchParams.delete("query");
+  window.history.replaceState({}, document.title, urlParams.toString());
   const message = {
     type: "alphablocks-parent-url",
     data: {

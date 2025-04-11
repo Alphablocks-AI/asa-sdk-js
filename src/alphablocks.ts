@@ -1,7 +1,7 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "./constants/index.ts";
 import { AlphaBlocksConstructor, IFrameDimensions } from "./types/index.ts";
 import { getAssistantDetails, getEndUser } from "./utils/api.ts";
-import { getCookie, sendSessionCookie, setCookie } from "./utils/cookie.ts";
+import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
 import {
   createWrapper,
   getChatIconHTML,
@@ -60,6 +60,9 @@ export class AlphaBlocks {
       case "alphablocks-request-parent-url":
         sendParentUrlParams(this.iframe, this.assistantId);
         break;
+      case "alphablocks-request-cart-cookie":
+        this.handleCartCookie();
+        break;
     }
   }
 
@@ -75,7 +78,16 @@ export class AlphaBlocks {
     }
 
     this.endUserId = sessionCookie;
-    sendSessionCookie(sessionCookie, this.iframe, isExisted);
+    sendCookie(sessionCookie, this.iframe, isExisted, "session-cookie");
+  }
+
+  private handleCartCookie(): void {
+    if (!this.assistantId) return;
+
+    const isExisted = true;
+    const cartCookie = getCookie("cart");
+
+    sendCookie(cartCookie, this.iframe, isExisted, "cart-cookie");
   }
 
   public renderPill(container: string | HTMLElement): void {

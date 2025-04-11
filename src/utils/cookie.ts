@@ -28,13 +28,14 @@ export function getCookie(name: string): string {
   return "";
 }
 
-export function sendSessionCookie(
+export function sendCookie(
   sessionCookie: string,
   iframe: HTMLIFrameElement | null,
   isExisted: boolean,
+  cookieType: string,
 ): void {
   const message = {
-    type: "session-cookie",
+    type: cookieType,
     data: {
       sessionId: sessionCookie,
       cookieIsExisted: isExisted,
