@@ -20,7 +20,7 @@ export function setCookie(name: string, cookieType: string, cookieValue?: string
       return sessionId;
     }
     case "cart": {
-      document.cookie = `${name}=${cookieValue}`;
+      document.cookie = `${name}=${cookieValue};path=/`;
       return "";
     }
     default:
