@@ -10,12 +10,22 @@ export function generateRandomString(length: number): string {
   return result;
 }
 
-export function setCookie(name: string): string {
-  const expires = new Date();
-  expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const sessionId = generateRandomString(8);
-  document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
-  return sessionId;
+export function setCookie(name: string, cookieType: string, cookieValue?: string): string {
+  switch (cookieType) {
+    case "sessionId": {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const sessionId = generateRandomString(8);
+      document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
+      return sessionId;
+    }
+    case "cart": {
+      document.cookie = `${name}=${cookieValue}`;
+      return "";
+    }
+    default:
+      return "";
+  }
 }
 
 export function getCookie(name: string): string {
@@ -29,17 +39,13 @@ export function getCookie(name: string): string {
 }
 
 export function sendCookie(
-  sessionCookie: string,
+  data: Record<string, any>,
   iframe: HTMLIFrameElement | null,
-  isExisted: boolean,
   cookieType: string,
 ): void {
   const message = {
     type: cookieType,
-    data: {
-      sessionId: sessionCookie,
-      cookieIsExisted: isExisted,
-    },
+    data,
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);

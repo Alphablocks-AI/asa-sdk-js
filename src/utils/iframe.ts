@@ -1,5 +1,5 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "../constants/index.ts";
-import { IFrameDimensions } from "../types/index.ts";
+import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
 import { getElement } from "./dom.ts";
 
@@ -18,10 +18,7 @@ export function createIFrame(
   return iframe;
 }
 
-export function setIframeSize(
-  properties: IFrameDimensions,
-  iframe: HTMLIFrameElement | null,
-): void {
+export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameElement | null): void {
   if (!iframe || !properties.height || !properties.width) return;
 
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
@@ -30,7 +27,7 @@ export function setIframeSize(
   if (window.innerWidth <= 500) {
     wrapperDiv.style.right = "16px";
     wrapperDiv.style.bottom = "16px";
-    iframe.style.height = `${window.innerHeight}px`;
+    iframe.style.height = properties.height;
   } else {
     wrapperDiv.style.right = "24px";
     wrapperDiv.style.bottom = "24px";

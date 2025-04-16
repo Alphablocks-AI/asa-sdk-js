@@ -1,5 +1,5 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "./constants/index.ts";
-import { AlphaBlocksConstructor, IFrameDimensions } from "./types/index.ts";
+import { AlphaBlocksConstructor, EventDataType } from "./types/index.ts";
 import { getAssistantDetails, getEndUser } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
 import {
@@ -42,7 +42,7 @@ export class AlphaBlocks {
     });
   }
 
-  private handleEvents(type: string, data: IFrameDimensions): void {
+  private handleEvents(type: string, data: EventDataType): void {
     if (!type) return;
     switch (type) {
       case "alphablocks-resize":
@@ -61,7 +61,10 @@ export class AlphaBlocks {
         sendParentUrlParams(this.iframe, this.assistantId);
         break;
       case "alphablocks-request-cart-cookie":
-        this.handleCartCookie();
+        this.handleCartCookie("alphablocks-request-cart-cookie", data);
+        break;
+      case "alphablocks-store-cart-cookie":
+        this.handleCartCookie("alphablocks-store-cart-cookie", data);
         break;
     }
   }
@@ -74,20 +77,24 @@ export class AlphaBlocks {
 
     if (!sessionCookie) {
       isExisted = false;
-      sessionCookie = setCookie(`alphablocks-sessionId-${this.assistantId}`);
+      sessionCookie = setCookie(`alphablocks-sessionId-${this.assistantId}`, "sessionId");
     }
 
     this.endUserId = sessionCookie;
-    sendCookie(sessionCookie, this.iframe, isExisted, "session-cookie");
+    sendCookie({ sessionCookie, cookieIsExisted: isExisted }, this.iframe, "session-cookie");
   }
 
-  private handleCartCookie(): void {
+  private handleCartCookie(event: string, data: EventDataType): void {
     if (!this.assistantId) return;
-
-    const isExisted = true;
-    const cartCookie = getCookie("cart");
-
-    sendCookie(cartCookie, this.iframe, isExisted, "cart-cookie");
+    if (event === "alphablocks-request-cart-cookie") {
+      const cartCookie = getCookie("cart");
+      const cartSig = getCookie("cart_sig");
+      sendCookie({ cart: cartCookie, cartSig }, this.iframe, "cart-cookie");
+    }
+    if (event === "alphablocks-store-cart-cookie") {
+      setCookie("cart", "cart", data.cart);
+      setCookie("cart_sig", "cart", data.cart_sig);
+    }
   }
 
   public renderPill(container: string | HTMLElement): void {
