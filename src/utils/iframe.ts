@@ -15,6 +15,7 @@ export function createIFrame(
   iframe.style.width = version === 1 ? width : "562px";
   iframe.style.height = version === 1 ? "60px" : "545px";
   iframe.style.border = "none";
+  iframe.style.background = "transparent";
   return iframe;
 }
 
@@ -24,18 +25,23 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
   iframe.style.width = properties.width;
 
+  wrapperDiv.style.width = "fit-content";
+  wrapperDiv.style.height = "fit-content";
+
   if (window.innerWidth <= 500) {
     wrapperDiv.style.right = "16px";
     wrapperDiv.style.bottom = "16px";
+    if (properties.right && properties.bottom) {
+      wrapperDiv.style.right = properties.right;
+      wrapperDiv.style.bottom = properties.bottom;
+    }
+    wrapperDiv.style.width = properties.width;
     iframe.style.height = properties.height;
   } else {
     wrapperDiv.style.right = "24px";
     wrapperDiv.style.bottom = "24px";
     iframe.style.height = properties.height;
   }
-
-  wrapperDiv.style.width = "fit-content";
-  wrapperDiv.style.height = "fit-content";
 
   if (properties.right && properties.left && properties.bottom) {
     wrapperDiv.style.right = properties.right;
@@ -70,18 +76,20 @@ export function sendParentUrlParams(
   iframe: HTMLIFrameElement | null,
   assistantId: number | null,
 ): void {
-  const urlParams = new URL(window.location.href);
-  const askAsa = urlParams.searchParams.get("ask_asa") === "true";
-  const query = urlParams.searchParams.get("query") || "";
+  const url = new URL(window.location.href);
+  const askAsa = url.searchParams.get("ask_asa") === "true";
+  const query = url.searchParams.get("query") || "";
+  const urlPath = url.pathname;
   const sessionCookie = getCookie(`alphablocks-sessionId-${assistantId}`);
-  urlParams.searchParams.delete("ask_asa");
-  urlParams.searchParams.delete("query");
-  window.history.replaceState({}, document.title, urlParams.toString());
+  url.searchParams.delete("ask_asa");
+  url.searchParams.delete("query");
+  window.history.replaceState({}, document.title, url.toString());
   const message = {
     type: "alphablocks-parent-url",
     data: {
       ask_asa: askAsa,
       query,
+      urlPath,
       sessionCookie,
     },
   };
