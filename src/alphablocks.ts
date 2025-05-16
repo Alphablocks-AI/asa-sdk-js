@@ -66,6 +66,10 @@ export class AlphaBlocks {
       case "alphablocks-store-cart-cookie":
         this.handleCartCookie("alphablocks-store-cart-cookie", data);
         break;
+      case "alphablocks-nudge-render":
+        if (!this.iframe) return;
+        this.iframe.style.display = "block";
+        break;
     }
   }
 
