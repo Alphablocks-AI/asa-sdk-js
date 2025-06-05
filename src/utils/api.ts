@@ -14,12 +14,15 @@ export async function getEndUser(assistantId: number, endUserId: string) {
 
 export async function getAssistantDetails(token: string) {
   try {
-    const response = await fetch(`${API_URL}/assistant/widget/assistant-details/?token=${token}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "*",
+    const response = await fetch(
+      `${API_URL}/assistant/widget/assistant-details/?token=${token}&origin=sdk`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "*",
+        },
       },
-    });
+    );
     return await response.json();
   } catch (error) {
     console.error("Error fetching assistant details:", error);
