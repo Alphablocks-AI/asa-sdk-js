@@ -98,6 +98,7 @@ export class AlphaBlocks {
     if (event === "alphablocks-store-cart-cookie") {
       setCookie("cart", "cart", data.cart);
       setCookie("cart_sig", "cart", data.cart_sig);
+      document.location.reload();
     }
   }
 
