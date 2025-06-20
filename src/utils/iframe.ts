@@ -16,6 +16,7 @@ export function createIFrame(
   iframe.style.height = version === 1 ? "60px" : "545px";
   iframe.style.border = "none";
   iframe.style.background = "transparent";
+  iframe.allow = "microphone";
   return iframe;
 }
 
