@@ -74,14 +74,14 @@ export class AlphaBlocks {
   }
 
   private handleSessionCookie(): void {
-    if (!this.assistantId) return;
+    if (!this.token) return;
 
     let isExisted = true;
-    let sessionCookie = getCookie(`alphablocks-sessionId-${this.assistantId}`);
+    let sessionCookie = getCookie(`alphablocks-sessionId-${this.token}`);
 
     if (!sessionCookie) {
       isExisted = false;
-      sessionCookie = setCookie(`alphablocks-sessionId-${this.assistantId}`, "sessionId");
+      sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
     }
 
     this.endUserId = sessionCookie;
