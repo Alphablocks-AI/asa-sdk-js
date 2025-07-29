@@ -29,6 +29,12 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";
 
+  if (properties.event === "mobileNudgeView") {
+    wrapperDiv.style.left = "16px";
+    iframe.style.width = "100%";
+  } else {
+    wrapperDiv.style.removeProperty("left");
+  }
   if (window.innerWidth <= 500) {
     wrapperDiv.style.right = "16px";
     wrapperDiv.style.bottom = "16px";
@@ -55,10 +61,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
 export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): void {
   const message = {
     type: "alphablocks-original-size",
-    data: {
-      width: window.innerWidth,
-      height: window.innerHeight,
-    },
+    data: { width: window.innerWidth, height: window.innerHeight },
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);
@@ -87,12 +90,7 @@ export function sendParentUrlParams(
   window.history.replaceState({}, document.title, url.toString());
   const message = {
     type: "alphablocks-parent-url",
-    data: {
-      ask_asa: askAsa,
-      query,
-      urlPath,
-      sessionCookie,
-    },
+    data: { ask_asa: askAsa, query, urlPath, sessionCookie },
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);
