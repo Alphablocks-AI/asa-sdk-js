@@ -1,5 +1,8 @@
 import { ALPHABLOCKS_WRAPPER_ID } from "../constants/index.ts";
 
+// Store the current position to prevent it from being overwritten by setIframeSize
+let currentPosition: string = "bottom-right";
+
 export function getElement(container: string | HTMLElement): HTMLElement {
   if (typeof container === "string") {
     const element = document.getElementById(container);
@@ -24,6 +27,9 @@ export function updateWrapperProperties(properties: { position: string }): void 
   wrapperDiv.style.right = "";
   wrapperDiv.style.transform = "";
 
+  // Store the current position
+  currentPosition = properties.position;
+
   switch (properties.position) {
     case "bottom-left":
       wrapperDiv.style.left = "24px";
@@ -36,6 +42,11 @@ export function updateWrapperProperties(properties: { position: string }): void 
       wrapperDiv.style.right = "24px";
       break;
   }
+}
+
+// Export function to get current position
+export function getCurrentPosition(): string {
+  return currentPosition;
 }
 
 export function getChatIconHTML(

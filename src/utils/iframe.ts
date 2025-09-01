@@ -1,7 +1,7 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
-import { getElement } from "./dom.ts";
+import { getElement, getCurrentPosition } from "./dom.ts";
 
 export function createIFrame(
   token: string,
@@ -29,14 +29,33 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";
 
+  // Get the current position to respect positioning set by updateWrapperProperties
+  const currentPosition = getCurrentPosition();
+
   if (properties.event === "mobileNudgeView") {
     wrapperDiv.style.left = "16px";
     iframe.style.width = "100%";
   } else {
-    wrapperDiv.style.removeProperty("left");
+    // Only remove left property if we're not in bottom-left or bottom-center position
+    if (currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
+      wrapperDiv.style.removeProperty("left");
+    }
   }
+
   if (window.innerWidth <= 500) {
-    wrapperDiv.style.right = "16px";
+    // For mobile, respect the current position but adjust spacing
+    if (currentPosition === "bottom-left") {
+      wrapperDiv.style.left = "16px";
+      wrapperDiv.style.right = "";
+    } else if (currentPosition === "bottom-center") {
+      wrapperDiv.style.left = "50%";
+      wrapperDiv.style.transform = "translateX(-50%)";
+      wrapperDiv.style.right = "";
+    } else {
+      wrapperDiv.style.right = "16px";
+      wrapperDiv.style.left = "";
+      wrapperDiv.style.transform = "";
+    }
     wrapperDiv.style.bottom = "16px";
     if (properties.right && properties.bottom) {
       wrapperDiv.style.right = properties.right;
@@ -45,7 +64,20 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     wrapperDiv.style.width = properties.width;
     iframe.style.height = properties.height;
   } else {
-    wrapperDiv.style.right = "24px";
+    // For desktop, respect the current position
+    if (currentPosition === "bottom-left") {
+      wrapperDiv.style.left = "24px";
+      wrapperDiv.style.right = "";
+      wrapperDiv.style.transform = "";
+    } else if (currentPosition === "bottom-center") {
+      wrapperDiv.style.left = "50%";
+      wrapperDiv.style.transform = "translateX(-50%)";
+      wrapperDiv.style.right = "";
+    } else {
+      wrapperDiv.style.right = "24px";
+      wrapperDiv.style.left = "";
+      wrapperDiv.style.transform = "";
+    }
     wrapperDiv.style.bottom = "24px";
     iframe.style.height = properties.height;
   }
