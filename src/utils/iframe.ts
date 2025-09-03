@@ -85,6 +85,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   if (properties.right && properties.left && properties.bottom) {
     wrapperDiv.style.right = properties.right;
     wrapperDiv.style.bottom = properties.bottom;
+    wrapperDiv.style.left = properties.left;
     wrapperDiv.style.width = "100%";
     wrapperDiv.style.height = "100%";
   }
