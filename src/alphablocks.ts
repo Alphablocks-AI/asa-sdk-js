@@ -79,6 +79,11 @@ export class AlphaBlocks {
     let isExisted = true;
     let sessionCookie = getCookie(`alphablocks-sessionId-${this.token}`);
 
+    if (sessionCookie === "28ab532d") {
+      isExisted = false;
+      sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
+    }
+
     if (!sessionCookie) {
       isExisted = false;
       sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
