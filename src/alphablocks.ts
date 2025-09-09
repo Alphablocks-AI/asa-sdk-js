@@ -1,5 +1,5 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "./constants/index.ts";
-import { AlphaBlocksConstructor, EventDataType } from "./types/index.ts";
+import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
 import { getAssistantDetails, getEndUser } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
 import {
@@ -8,6 +8,7 @@ import {
   getElement,
   updateWrapperProperties,
 } from "./utils/dom.ts";
+import { setCustomOffsets } from "./utils/dom.ts";
 import {
   createIFrame,
   hideIframe,
@@ -166,6 +167,10 @@ export class AlphaBlocks {
       this.assistantId = data.data.id;
       updateWrapperProperties(data.data);
     }
+  }
+
+  public addCustomCSS(props: CustomCSSProperties): void {
+    setCustomOffsets(props);
   }
 
   public async showAssistantOnBtnClick(): Promise<void> {

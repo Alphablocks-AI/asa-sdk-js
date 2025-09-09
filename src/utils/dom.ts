@@ -1,7 +1,9 @@
 import { ALPHABLOCKS_WRAPPER_ID } from "../constants/index.ts";
+import { CustomCSSProperties } from "../types/index.ts";
 
 // Store the current position to prevent it from being overwritten by setIframeSize
 let currentPosition: string = "bottom-right";
+let customOffsets: CustomCSSProperties = {};
 
 export function getElement(container: string | HTMLElement): HTMLElement {
   if (typeof container === "string") {
@@ -62,4 +64,19 @@ export function getChatIconHTML(
           <p class="alphablocks-chat-icon-name" style="color:${textColor}">${name}</p>
       </button>
     </div>`;
+}
+
+export function setCustomOffsets(offsets: CustomCSSProperties): void {
+  customOffsets = { ...customOffsets, ...offsets };
+  const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+  if (offsets.bottom) {
+    wrapperDiv.style.bottom = offsets.bottom;
+  }
+  if (offsets.right && currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
+    wrapperDiv.style.right = offsets.right;
+  }
+}
+
+export function getCustomOffsets(): CustomCSSProperties {
+  return { ...customOffsets };
 }

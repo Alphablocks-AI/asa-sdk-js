@@ -1,7 +1,7 @@
 import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
-import { getElement, getCurrentPosition } from "./dom.ts";
+import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
 
 export function createIFrame(
   token: string,
@@ -31,6 +31,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
 
   // Get the current position to respect positioning set by updateWrapperProperties
   const currentPosition = getCurrentPosition();
+  const custom = getCustomOffsets();
 
   if (properties.event === "mobileNudgeView") {
     wrapperDiv.style.left = "16px";
@@ -52,15 +53,19 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       wrapperDiv.style.transform = "translateX(-50%)";
       wrapperDiv.style.right = "";
     } else {
-      wrapperDiv.style.right = "16px";
+      wrapperDiv.style.right = custom.right || "16px";
       wrapperDiv.style.left = "";
       wrapperDiv.style.transform = "";
     }
-    wrapperDiv.style.bottom = "16px";
-    if (properties.right && properties.bottom) {
+    wrapperDiv.style.bottom = custom.bottom || "16px";
+    // If event provides explicit overrides, apply them (each independently)
+    if (
+      properties.right &&
+      currentPosition !== "bottom-left" &&
+      currentPosition !== "bottom-center"
+    )
       wrapperDiv.style.right = properties.right;
-      wrapperDiv.style.bottom = properties.bottom;
-    }
+    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
     wrapperDiv.style.width = properties.width;
     iframe.style.height = properties.height;
   } else {
@@ -74,11 +79,19 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       wrapperDiv.style.transform = "translateX(-50%)";
       wrapperDiv.style.right = "";
     } else {
-      wrapperDiv.style.right = "24px";
+      wrapperDiv.style.right = custom.right || "24px";
       wrapperDiv.style.left = "";
       wrapperDiv.style.transform = "";
     }
-    wrapperDiv.style.bottom = "24px";
+    wrapperDiv.style.bottom = custom.bottom || "24px";
+    // Allow event to override custom/default individually
+    if (
+      properties.right &&
+      currentPosition !== "bottom-left" &&
+      currentPosition !== "bottom-center"
+    )
+      wrapperDiv.style.right = properties.right;
+    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
     iframe.style.height = properties.height;
   }
 
