@@ -1,4 +1,8 @@
-import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "./constants/index.ts";
+import {
+  ALPHABLOCKS_WRAPPER_ID,
+  CHATBOT_URL,
+  ASSISTANT_DETAILS_STORAGE_KEY,
+} from "./constants/index.ts";
 import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
 import { getAssistantDetails, getEndUser } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
@@ -161,11 +165,25 @@ export class AlphaBlocks {
 
   public async renderWrapper(): Promise<void> {
     createWrapper();
+
+    const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
+    const cachedAssistantDetails = sessionStorage.getItem(storageKey);
+    if (cachedAssistantDetails) {
+      const parsedAssistantDetails = JSON.parse(cachedAssistantDetails);
+      if (parsedAssistantDetails) {
+        this.assistantName = parsedAssistantDetails.name;
+        this.assistantId = parsedAssistantDetails.id;
+        updateWrapperProperties(parsedAssistantDetails);
+        return;
+      }
+    }
+
     const data = await getAssistantDetails(this.token);
-    if (data) {
+    if (data && data.data?.assistant_details) {
       this.assistantName = data.data.name;
       this.assistantId = data.data.id;
-      updateWrapperProperties(data.data);
+      sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
+      updateWrapperProperties(data.data.assistant_details);
     }
   }
 
