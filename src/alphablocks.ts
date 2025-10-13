@@ -31,6 +31,7 @@ export class AlphaBlocks {
   private assistantTextColor: string = "";
   private iframe: HTMLIFrameElement | null = null;
   public endUserId: string = "";
+  public userId: string = "";
 
   constructor(props: AlphaBlocksConstructor) {
     this.token = props.token;
@@ -41,6 +42,7 @@ export class AlphaBlocks {
     this.assistantTheme = props.theme || "";
     this.assistantId = props.id || null;
     this.endUserId = props.endUserId || "";
+    this.userId = props.userId || "";
 
     window.addEventListener("message", (event) => {
       this.handleEvents(event.data.type, event.data.data);
@@ -93,9 +95,13 @@ export class AlphaBlocks {
       isExisted = false;
       sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
     }
-
+    console.log("this.userId", this.userId);
     this.endUserId = sessionCookie;
-    sendCookie({ sessionCookie, cookieIsExisted: isExisted }, this.iframe, "session-cookie");
+    sendCookie(
+      { sessionCookie, cookieIsExisted: isExisted, userId: this.userId },
+      this.iframe,
+      "session-cookie",
+    );
   }
 
   private handleCartCookie(event: string, data: EventDataType): void {
