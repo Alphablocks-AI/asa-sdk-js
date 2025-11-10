@@ -116,6 +116,10 @@ export class AlphaBlocks {
       setCookie("cart_sig", "cart", data.cart_sig);
       document.location.reload();
     }
+    if (event === "alphablocks-store-cart-attr-cookie") {
+      setCookie("cart", "cart", data.cart);
+      setCookie("cart_sig", "cart", data.cart_sig);
+    }
   }
 
   public renderPill(container: string | HTMLElement): void {
