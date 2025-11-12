@@ -14,6 +14,11 @@ import {
 } from "./utils/dom.ts";
 import { setCustomOffsets } from "./utils/dom.ts";
 import {
+  handleAddProductToCart,
+  handleGetCartDetails,
+  handleSetCartAttributes,
+} from "./utils/event-handler.ts";
+import {
   createIFrame,
   hideIframe,
   sendOriginalWindowMessage,
@@ -73,6 +78,15 @@ export class AlphaBlocks {
       case "alphablocks-store-cart-cookie":
         this.handleCartCookie("alphablocks-store-cart-cookie", data);
         break;
+      case "alphablocks-set-cart-attributes":
+        this.handleCartUpdates("alphablocks-set-cart-attributes", data);
+        break;
+      case "alphablocks-add-product-to-cart":
+        this.handleCartUpdates("alphablocks-add-product-to-cart", data);
+        break;
+      case "alphablocks-get-cart-details":
+        this.handleCartUpdates("alphablocks-get-cart-details", data);
+        break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
@@ -115,6 +129,18 @@ export class AlphaBlocks {
       setCookie("cart", "cart", data.cart);
       setCookie("cart_sig", "cart", data.cart_sig);
       document.location.reload();
+    }
+  }
+
+  private async handleCartUpdates(event: string, data: EventDataType): Promise<void> {
+    if (event === "alphablocks-set-cart-attributes") {
+      await handleSetCartAttributes(this.assistantId, this.endUserId);
+    }
+    if (event === "alphablocks-add-product-to-cart") {
+      await handleAddProductToCart(data.variantId, data.quantity, this.iframe);
+    }
+    if (event === "alphablocks-get-cart-details") {
+      await handleGetCartDetails(this.iframe);
     }
   }
 
