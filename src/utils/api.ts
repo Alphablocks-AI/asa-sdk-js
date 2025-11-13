@@ -29,3 +29,36 @@ export async function getAssistantDetails(token: string) {
     return null;
   }
 }
+
+// 1️⃣ Get current cart
+export async function getCart() {
+  const res = await fetch("/cart.js", { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`getCart failed: ${res.status}`);
+  return res.json();
+}
+
+// 2️⃣ Update cart attributes
+export async function updateCartAttributes(newAttrs: Record<string, string>) {
+  const res = await fetch("/cart/update.js", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ attributes: newAttrs }),
+  });
+  if (!res.ok) throw new Error(`updateCartAttributes failed: ${res.status}`);
+  return res.json();
+}
+
+// 3️⃣ Add product to cart
+export async function addToCart(
+  variantId: number,
+  quantity: number = 1,
+  properties: Record<string, string> = { source: "asa.alphablocks.ai" },
+) {
+  const res = await fetch("/cart/add.js", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ items: [{ id: variantId, quantity, properties }] }),
+  });
+  if (!res.ok) throw new Error(`addToCart failed: ${res.status}`);
+  return res.json();
+}
