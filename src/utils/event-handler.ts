@@ -27,8 +27,20 @@ export async function handleSetCartAttributes(
       "asa.alphablocks.ai_end_user_id": endUserId,
     };
     const cart = await getCart();
+
+    // Merge existing attributes
     const updatedAttrs = { ...(cart.attributes || {}), ...newAttrs };
-    await updateCartAttributes(updatedAttrs);
+
+    // If cart is empty & cookie doesn't exist → force initialize the cart
+    if (cart.item_count === 0) {
+      await updateCartAttributes({
+        note: "init", // REQUIRED: triggers cart creation
+        attributes: updatedAttrs,
+      });
+    } else {
+      // Normal update if cart already exists
+      await updateCartAttributes({ attributes: updatedAttrs });
+    }
   } catch (err) {
     console.error("❌ handleSetCartAttributes error:", err);
   }
@@ -67,7 +79,7 @@ export async function handleAddProductToCart(
     };
 
     // 5️⃣ Update attributes on cart
-    await updateCartAttributes(updatedAttrs);
+    await updateCartAttributes({ attributes: updatedAttrs });
 
     // 6️⃣ Fetch the latest cart (optional but cleaner for response)
     const updatedCart = await getCart();
