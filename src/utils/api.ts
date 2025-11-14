@@ -38,13 +38,23 @@ export async function getCart() {
 }
 
 // 2️⃣ Update cart attributes
-export async function updateCartAttributes(payload: Record<string, string>) {
+export async function updateCartAttributes(payload: {
+  attributes: Record<string, string>;
+  note?: string;
+}) {
   const res = await fetch("/cart/update.js", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`updateCartAttributes failed: ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(`updateCartAttributes failed: ${res.status}`);
+  }
+
   return res.json();
 }
 

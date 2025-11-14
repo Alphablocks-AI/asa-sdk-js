@@ -21,26 +21,22 @@ export async function handleSetCartAttributes(
   endUserId: string,
 ): Promise<void> {
   if (!assistantId || !endUserId) return;
+
   try {
     const newAttrs = {
       "asa.alphablocks.ai_assistant_id": assistantId.toString(),
       "asa.alphablocks.ai_end_user_id": endUserId,
     };
-    const cart = await getCart();
 
-    // Merge existing attributes
+    const cart = await getCart();
     const updatedAttrs = { ...(cart.attributes || {}), ...newAttrs };
 
-    // If cart is empty & cookie doesn't exist → force initialize the cart
-    if (cart.item_count === 0) {
-      await updateCartAttributes({
-        note: "init", // REQUIRED: triggers cart creation
-        attributes: updatedAttrs,
-      });
-    } else {
-      // Normal update if cart already exists
-      await updateCartAttributes({ attributes: updatedAttrs });
-    }
+    const payload = {
+      attributes: updatedAttrs,
+      note: cart.item_count === 0 ? "init" : undefined,
+    };
+
+    await updateCartAttributes(payload);
   } catch (err) {
     console.error("❌ handleSetCartAttributes error:", err);
   }
