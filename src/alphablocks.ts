@@ -137,7 +137,13 @@ export class AlphaBlocks {
       await handleSetCartAttributes(this.assistantId, this.endUserId);
     }
     if (event === "alphablocks-add-product-to-cart") {
-      await handleAddProductToCart(data.variantId, data.quantity, this.iframe);
+      await handleAddProductToCart(
+        data.variantId,
+        data.quantity,
+        this.iframe,
+        this.assistantId,
+        this.endUserId,
+      );
     }
     if (event === "alphablocks-get-cart-details") {
       await handleGetCartDetails(this.iframe);

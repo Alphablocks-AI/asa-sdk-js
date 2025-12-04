@@ -111,6 +111,8 @@ export async function handleAddProductToCart(
   variantId: number | undefined,
   quantity: number = 1,
   iframe: HTMLIFrameElement | null,
+  assistantId: number | null,
+  endUserId: string,
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
@@ -125,10 +127,24 @@ export async function handleAddProductToCart(
 
     // 4) Prepare attributes merging existing attributes on cart
     const existingAttrs = cart.attributes || {};
-    const updatedAttrs = {
+    const updatedAttrs: Record<string, string> = {
       ...existingAttrs,
-      "asa.alphablocks.ai_line_items": existingLineItems + ", " + variantId,
+      "asa.alphablocks.ai_line_items": existingLineItems
+        ? `${existingLineItems}, ${variantId}`
+        : `${variantId}`,
     };
+
+    // 4.1) Ensure assistant/end-user attributes exist:
+    //      - If they already exist on the cart, leave them as-is
+    //      - If missing AND we have values, add them
+    if (assistantId && endUserId) {
+      if (!updatedAttrs["asa.alphablocks.ai_assistant_id"]) {
+        updatedAttrs["asa.alphablocks.ai_assistant_id"] = assistantId.toString();
+      }
+      if (!updatedAttrs["asa.alphablocks.ai_end_user_id"]) {
+        updatedAttrs["asa.alphablocks.ai_end_user_id"] = endUserId;
+      }
+    }
 
     // 5) Persist attributes using the correct payload shape
     //    updateCartAttributes expects { attributes: Record<string,string>, note?: string }
