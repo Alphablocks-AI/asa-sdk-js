@@ -14,7 +14,7 @@ export function setCookie(name: string, cookieType: string, cookieValue?: string
   switch (cookieType) {
     case "sessionId": {
       const expires = new Date();
-      expires.setTime(expires.getTime() + 7 * 24 * 60 * 60 * 1000);
+      expires.setTime(expires.getTime() + 365 * 24 * 60 * 60 * 1000);
       const sessionId = generateRandomString(8);
       document.cookie = `${name}=${sessionId};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
       return sessionId;
@@ -39,7 +39,7 @@ export function getCookie(name: string): string {
 }
 
 export function sendCookie(
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   iframe: HTMLIFrameElement | null,
   cookieType: string,
 ): void {
