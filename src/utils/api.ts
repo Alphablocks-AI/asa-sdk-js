@@ -1,9 +1,9 @@
 import { API_URL } from "../constants/index.ts";
 
-export async function getEndUser(assistantId: number, endUserId: string) {
+export async function getEndUser(assistantId: number, endUserId: string, userId: string) {
   try {
     const response = await fetch(
-      `${API_URL}/chat/widget/get-user/?assistant_id=${assistantId}&end_user_id=${endUserId}`,
+      `${API_URL}/chat/widget/get-user/?assistant_id=${assistantId}&end_user_id=${endUserId}&user_id=${userId}`,
     );
     return await response.json();
   } catch (error) {

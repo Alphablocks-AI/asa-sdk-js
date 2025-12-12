@@ -243,7 +243,7 @@ export class AlphaBlocks {
     }
 
     if (this.assistantId && this.endUserId) {
-      await getEndUser(this.assistantId, this.endUserId);
+      await getEndUser(this.assistantId, this.endUserId, this.userId);
     }
   }
 
