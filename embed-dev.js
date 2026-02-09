@@ -9,7 +9,7 @@
  *
  * Usage (Local Development):
  *   <script
- *     src="./embed-dev.js"
+ *     src="http://127.0.0.1:5500/dist-dev/embed-dev.js"
  *     data-token="pk_your_token_here"
  *   ></script>
  *
@@ -37,7 +37,9 @@
   // Default to local dist-dev path, allow override
   const SDK_URL =
     window.ALPHABLOCKS_SDK_URL ||
-    (isLocal ? "/dist-dev/index.umd.js" : "https://unpkg.com/asa-sdk@latest/dist/index.umd.js");
+    (isLocal
+      ? "http://127.0.0.1:5500/dist-dev/index.umd.js"
+      : "https://unpkg.com/asa-sdk@latest/dist/index.umd.js");
 
   /**
    * Get token from script tag data attribute or global variable
