@@ -36,7 +36,11 @@ const config = {
     }),
     typescript(),
     copy({
-      targets: [{ src: "src/styles.css", dest: "dist" }],
+      targets: [
+        { src: "src/styles.css", dest: outputDir },
+        { src: "embed.js", dest: outputDir },
+        ...(isDev ? [{ src: "embed-dev.js", dest: outputDir }] : []),
+      ],
     }),
   ],
 };

@@ -10,7 +10,10 @@ export function createIFrame(
   version: number,
 ): HTMLIFrameElement {
   const iframe = document.createElement("iframe");
-  const width = name.length <= 7 ? "120px" : name.length <= 15 ? "170px" : "235px";
+  // Ensure name is a string and has a default value
+  const assistantName = name || "";
+  const width =
+    assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
   iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}&theme=${theme}`;
   iframe.style.width = version === 1 ? width : "562px";
   iframe.style.height = version === 1 ? "60px" : "545px";
