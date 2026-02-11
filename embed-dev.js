@@ -39,7 +39,7 @@
     window.ALPHABLOCKS_SDK_URL ||
     (isLocal
       ? "http://127.0.0.1:5500/dist-dev/index.umd.js"
-      : "https://unpkg.com/asa-sdk@latest/dist/index.umd.js");
+      : "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js");
 
   /**
    * Get token from script tag data attribute or global variable
