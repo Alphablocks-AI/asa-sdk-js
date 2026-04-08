@@ -15,6 +15,7 @@ import {
 import { setCustomOffsets } from "./utils/dom.ts";
 import {
   handleAddProductToCart,
+  handleCheckSearchProducts,
   handleGetCartDetails,
   handleSetCartAttributes,
 } from "./utils/event-handler.ts";
@@ -87,6 +88,9 @@ export class AlphaBlocks {
       case "alphablocks-get-cart-details":
         this.handleCartUpdates("alphablocks-get-cart-details", data);
         break;
+      case "alphablocks-check-search-products":
+        this.handleCartUpdates("alphablocks-check-search-products", data);
+        break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
@@ -147,6 +151,9 @@ export class AlphaBlocks {
     }
     if (event === "alphablocks-get-cart-details") {
       await handleGetCartDetails(this.iframe);
+    }
+    if (event === "alphablocks-check-search-products") {
+      await handleCheckSearchProducts(data.query || "", this.iframe);
     }
   }
 

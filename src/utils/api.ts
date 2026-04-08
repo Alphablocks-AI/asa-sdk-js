@@ -72,3 +72,35 @@ export async function addToCart(
   if (!res.ok) throw new Error(`addToCart failed: ${res.status}`);
   return res.json();
 }
+
+export async function getSearchProductsCount(query: string): Promise<{
+  hasProducts: boolean;
+  productCount: number;
+}> {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) {
+    return { hasProducts: false, productCount: 0 };
+  }
+
+  const params = new URLSearchParams({
+    q: normalizedQuery,
+    "resources[type]": "product",
+    "resources[limit]": "1",
+  });
+
+  const res = await fetch(
+    `https://asademo.alphablocks.ai/search/suggest.json?${params.toString()}`,
+    {
+      headers: { Accept: "application/json" },
+    },
+  );
+  console.log(res, "res>>>>>>>>>");
+  if (!res.ok) {
+    throw new Error(`getSearchProductsCount failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const products = data?.resources?.results?.products;
+  const productCount = Array.isArray(products) ? products.length : 0;
+  return { hasProducts: productCount > 0, productCount };
+}

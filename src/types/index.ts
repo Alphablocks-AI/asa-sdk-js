@@ -23,6 +23,12 @@ export interface EventDataType {
   variantId?: number;
   quantity?: number;
   event?: string;
+  query?: string;
+  searchQuery?: string;
+  hasProducts?: boolean;
+  productCount?: number;
+  success?: boolean;
+  error?: string;
 }
 
 export interface CustomCSSProperties {

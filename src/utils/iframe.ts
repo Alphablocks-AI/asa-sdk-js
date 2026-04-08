@@ -132,15 +132,16 @@ export function sendParentUrlParams(
   const url = new URL(window.location.href);
   const askAsa = url.searchParams.get("ask_asa") === "true";
   const query = url.searchParams.get("query") || "";
-  const urlPath = url.pathname;
-  const params = urlPath.split("/").filter(Boolean);
+  const searchQuery = url.searchParams.get("q") || "";
+  const params = url.pathname.split("/").filter(Boolean);
   const sessionCookie = getCookie(`alphablocks-sessionId-${assistantId}`);
   url.searchParams.delete("ask_asa");
   url.searchParams.delete("query");
+  const urlPath = `${url.pathname}${url.search}`;
   window.history.replaceState({}, document.title, url.toString());
   const message = {
     type: "alphablocks-parent-url",
-    data: { ask_asa: askAsa, query, urlPath, params, sessionCookie },
+    data: { ask_asa: askAsa, query, searchQuery, urlPath, params, sessionCookie },
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);

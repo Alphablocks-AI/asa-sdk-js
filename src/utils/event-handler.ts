@@ -1,7 +1,8 @@
-import { addToCart, getCart, updateCartAttributes } from "./api.ts";
+import { addToCart, getCart, getSearchProductsCount, updateCartAttributes } from "./api.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
 const ADD_PRODUCT_TO_CART_RESPONSE = "alphablocks-add-product-to-cart-response";
+const SEARCH_PRODUCTS_RESPONSE = "alphablocks-check-search-products-response";
 
 // 🔹 0. Refresh cart UI
 export async function refreshCartUI(): Promise<void> {
@@ -173,6 +174,43 @@ export async function handleAddProductToCart(
       {
         type: ADD_PRODUCT_TO_CART_RESPONSE,
         data: { success: false, error: (err as Error).message || String(err) },
+      },
+      "*",
+    );
+  }
+}
+
+export async function handleCheckSearchProducts(
+  query: string,
+  iframe: HTMLIFrameElement | null,
+): Promise<void> {
+  if (!iframe?.contentWindow) return;
+
+  try {
+    const { hasProducts, productCount } = await getSearchProductsCount(query);
+    iframe.contentWindow.postMessage(
+      {
+        type: SEARCH_PRODUCTS_RESPONSE,
+        data: {
+          success: true,
+          query,
+          hasProducts,
+          productCount,
+        },
+      },
+      "*",
+    );
+  } catch (err) {
+    iframe.contentWindow.postMessage(
+      {
+        type: SEARCH_PRODUCTS_RESPONSE,
+        data: {
+          success: false,
+          query,
+          hasProducts: false,
+          productCount: 0,
+          error: (err as Error).message || String(err),
+        },
       },
       "*",
     );
