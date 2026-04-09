@@ -88,12 +88,9 @@ export async function getSearchProductsCount(query: string): Promise<{
     "resources[limit]": "1",
   });
 
-  const res = await fetch(
-    `https://asademo.alphablocks.ai/search/suggest.json?${params.toString()}`,
-    {
-      headers: { Accept: "application/json" },
-    },
-  );
+  const res = await fetch(`/search/suggest.json?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
   console.log(res, "res>>>>>>>>>");
   if (!res.ok) {
     throw new Error(`getSearchProductsCount failed: ${res.status}`);
