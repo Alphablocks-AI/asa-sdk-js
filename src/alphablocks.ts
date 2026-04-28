@@ -26,6 +26,12 @@ import {
   sendParentUrlParams,
   setIframeSize,
 } from "./utils/iframe.ts";
+import {
+  installShopifyCartFetchBridge,
+  registerCartBridgeIframe,
+} from "./utils/cart-fetch-bridge.ts";
+
+installShopifyCartFetchBridge();
 
 export class AlphaBlocks {
   private token: string;
@@ -40,6 +46,7 @@ export class AlphaBlocks {
   public userId: string = "";
 
   constructor(props: AlphaBlocksConstructor) {
+    registerCartBridgeIframe(() => this.iframe);
     this.token = props.token;
     this.assistantName = props.name || "";
     this.assistantAvatar = props.avatar || "";
@@ -204,7 +211,7 @@ export class AlphaBlocks {
       return;
     }
 
-    iframe.src = `${CHATBOT_URL}/?token=${this.token}&version=1&theme=${this.assistantTheme}`;
+    iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(this.token)}&version=1&theme=${encodeURIComponent(this.assistantTheme || "")}`;
     iframe.style.display = "block";
   }
 

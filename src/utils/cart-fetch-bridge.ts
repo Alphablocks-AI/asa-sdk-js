@@ -1,0 +1,245 @@
+import { CART_AJAX_EVENT, type CartAjaxEventName } from "./cart-ajax-constants.ts";
+
+/** Avoid `RequestInfo` / `RequestInit` in annotations — ESLint `no-undef` does not treat DOM lib types as defined. */
+type FetchInput = Parameters<typeof globalThis.fetch>[0];
+type FetchInit = Parameters<typeof globalThis.fetch>[1];
+
+/** postMessage type → widget (`useWidgetNudges`). Kept in sync with Asa-MonoRepo `WIDGET_CONSTANTS.PARENT_IFRAME`. */
+export const ALPHABLOCKS_SHOPIFY_CART_LINE_MESSAGE = "alphablocks-shopify-cart-line-event";
+
+type UnknownRecord = Record<string, unknown>;
+
+let patched = false;
+let innerFetch: typeof fetch;
+
+let resolveIframe: () => HTMLIFrameElement | null = () => null;
+
+/** Update whenever `AlphaBlocks` assigns `this.iframe` (latest embed wins if multiple). */
+export function registerCartBridgeIframe(getIframe: () => HTMLIFrameElement | null): void {
+  resolveIframe = getIframe;
+}
+
+function getChatbotTargetOrigin(iframe: HTMLIFrameElement): string {
+  try {
+    return new URL(iframe.src).origin;
+  } catch {
+    return "*";
+  }
+}
+
+function postCartLineToWidget(payload: UnknownRecord): void {
+  const iframe = resolveIframe();
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage(
+    { type: ALPHABLOCKS_SHOPIFY_CART_LINE_MESSAGE, data: payload },
+    getChatbotTargetOrigin(iframe),
+  );
+}
+
+function isRecord(v: unknown): v is UnknownRecord {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Shopify GET /cart.js (and change/update) shape. */
+function isFullCartJson(v: unknown): v is UnknownRecord {
+  if (!isRecord(v)) return false;
+  return Array.isArray(v.items) && typeof v.item_count === "number";
+}
+
+function lineKey(line: UnknownRecord): string {
+  if (typeof line.key === "string" && line.key.length > 0) return line.key;
+  const v = line.variant_id;
+  const p = line.product_id;
+  return `${v ?? ""}:${p ?? ""}`;
+}
+
+function handleFromProductUrl(url: string | undefined): string | undefined {
+  if (!url || typeof url !== "string") return undefined;
+  try {
+    const href = url.includes("://")
+      ? url
+      : `https://shop.example${url.startsWith("/") ? "" : "/"}${url}`;
+    const u = new URL(href);
+    const m = u.pathname.match(/\/products\/([^/?]+)/);
+    return m?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function payloadFromLine(line: UnknownRecord, eventName: CartAjaxEventName): UnknownRecord {
+  const productId = line.product_id;
+  return {
+    event_name: eventName,
+    product_id: productId !== undefined && productId !== null ? String(productId) : "",
+    product_title: String(line.product_title ?? line.title ?? ""),
+    product_url_handle:
+      line.handle !== undefined && line.handle !== null
+        ? String(line.handle)
+        : handleFromProductUrl(String(line.url ?? "")),
+    quantity: typeof line.quantity === "number" ? line.quantity : Number(line.quantity ?? 1),
+    variant_title: line.variant_title != null ? String(line.variant_title) : null,
+  };
+}
+
+function findRemovedLines(
+  prevItems: UnknownRecord[] | undefined,
+  nextItems: UnknownRecord[] | undefined,
+): UnknownRecord[] {
+  const nextKeys = new Set((nextItems ?? []).map(lineKey));
+  return (prevItems ?? []).filter((line) => !nextKeys.has(lineKey(line)));
+}
+
+/**
+ * After /cart/add.js the body may be a single line item, `{ items: [...] }`, or a full cart.
+ * Returns a full /cart.js-shaped object when possible.
+ */
+async function resolveFullCartAfterAdd(parsed: unknown): Promise<UnknownRecord | null> {
+  if (isFullCartJson(parsed)) {
+    return parsed;
+  }
+  try {
+    const r = await innerFetch("/cart.js", { headers: { Accept: "application/json" } });
+    if (!r.ok) return null;
+    const j: unknown = await r.json();
+    return isFullCartJson(j) ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildAddedEventPayload(
+  addResponse: unknown,
+  fullCart: UnknownRecord,
+  cartBeforeAdd: UnknownRecord | null,
+): UnknownRecord {
+  const prevKeys = new Set(
+    (cartBeforeAdd?.items as UnknownRecord[] | undefined)?.map(lineKey) ?? [],
+  );
+
+  if (isRecord(addResponse) && addResponse.product_id != null && !isFullCartJson(addResponse)) {
+    return {
+      ...payloadFromLine(addResponse as UnknownRecord, CART_AJAX_EVENT.PRODUCT_ADDED),
+      cart: fullCart,
+    };
+  }
+
+  const items = (fullCart.items as UnknownRecord[]) ?? [];
+  for (const line of items) {
+    if (!prevKeys.has(lineKey(line))) {
+      return { ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_ADDED), cart: fullCart };
+    }
+  }
+
+  const last = items[items.length - 1];
+  if (last) {
+    return { ...payloadFromLine(last, CART_AJAX_EVENT.PRODUCT_ADDED), cart: fullCart };
+  }
+
+  return {
+    event_name: CART_AJAX_EVENT.PRODUCT_ADDED,
+    product_id: "",
+    product_title: "",
+    cart: fullCart,
+  };
+}
+
+function pathnameFromFetchInput(input: FetchInput): string {
+  if (typeof input === "string") {
+    try {
+      return new URL(input, window.location.href).pathname;
+    } catch {
+      return "";
+    }
+  }
+  if (input instanceof URL) return input.pathname;
+  if (typeof Request !== "undefined" && input instanceof Request) {
+    try {
+      return new URL(input.url, window.location.href).pathname;
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function methodFromInit(input: FetchInput, init?: FetchInit): string {
+  if (init?.method) return init.method.toUpperCase();
+  if (typeof Request !== "undefined" && input instanceof Request) {
+    return input.method.toUpperCase();
+  }
+  return "GET";
+}
+
+let cartSnapshotCache: UnknownRecord | null = null;
+
+async function onFetchSettled(
+  input: FetchInput,
+  init: FetchInit | undefined,
+  response: Response,
+): Promise<void> {
+  if (!response.ok) return;
+  const ct = response.headers.get("content-type") ?? "";
+  if (!ct.includes("json") && !ct.includes("javascript")) return;
+
+  let parsed: unknown;
+  try {
+    parsed = await response.clone().json();
+  } catch {
+    return;
+  }
+
+  const pathname = pathnameFromFetchInput(input);
+  const method = methodFromInit(input, init);
+
+  if (pathname.endsWith("/cart.js") && method === "GET" && isFullCartJson(parsed)) {
+    cartSnapshotCache = parsed;
+    return;
+  }
+
+  if (pathname.endsWith("/cart/add.js")) {
+    const before = cartSnapshotCache;
+    const fullCart = await resolveFullCartAfterAdd(parsed);
+    if (!fullCart) return;
+    cartSnapshotCache = fullCart;
+    const body = buildAddedEventPayload(parsed, fullCart, before);
+    postCartLineToWidget(body);
+    return;
+  }
+
+  if (pathname.endsWith("/cart/change.js") || pathname.endsWith("/cart/update.js")) {
+    if (!isFullCartJson(parsed)) return;
+    const prevItems = (cartSnapshotCache?.items as UnknownRecord[] | undefined) ?? [];
+    const newCart = parsed;
+    const nextItems = (newCart.items as UnknownRecord[]) ?? [];
+    const removed = findRemovedLines(prevItems, nextItems);
+    cartSnapshotCache = newCart;
+
+    if (removed.length === 0) return;
+
+    const line = removed[0];
+    postCartLineToWidget({
+      ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
+      cart: newCart,
+    });
+  }
+}
+
+/**
+ * Patches `window.fetch` once. Observes Shopify Cart AJAX routes and posts
+ * `ALPHABLOCKS_SHOPIFY_CART_LINE_MESSAGE` to the widget iframe. Does not alter response bodies
+ * or reject requests.
+ */
+export function installShopifyCartFetchBridge(): void {
+  if (typeof window === "undefined" || patched) return;
+  patched = true;
+  innerFetch = window.fetch.bind(window);
+
+  window.fetch = async (input: FetchInput, init?: FetchInit): Promise<Response> => {
+    const response = await innerFetch(input, init);
+    void onFetchSettled(input, init, response).catch(() => {
+      /* ignore bridge errors — storefront fetch must not break */
+    });
+    return response;
+  };
+}

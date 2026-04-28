@@ -13,12 +13,17 @@ export async function getEndUser(assistantId: number, endUserId: string) {
 }
 
 export async function getAssistantDetails(token: string) {
+  const normalizedToken = token?.trim();
+  if (!normalizedToken || normalizedToken === "undefined" || normalizedToken === "null") {
+    return null;
+  }
+
   try {
     const response = await fetch(
-      `${API_URL}/assistant/widget/assistant-details/?token=${token}&origin=sdk`,
+      `${API_URL}/assistant/widget/assistant-details/?token=${encodeURIComponent(normalizedToken)}&origin=sdk`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${normalizedToken}`,
           "Content-Type": "*",
         },
       },
@@ -30,7 +35,7 @@ export async function getAssistantDetails(token: string) {
   }
 }
 
-// 1️⃣ Get current cart
+// 1️⃣ Get current cart (Shopify Cart Ajax)
 export async function getCart() {
   const res = await fetch("/cart.js", { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`getCart failed: ${res.status}`);
@@ -91,7 +96,6 @@ export async function getSearchProductsCount(query: string): Promise<{
   const res = await fetch(`/search/suggest.json?${params.toString()}`, {
     headers: { Accept: "application/json" },
   });
-  console.log(res, "res>>>>>>>>>");
   if (!res.ok) {
     throw new Error(`getSearchProductsCount failed: ${res.status}`);
   }
