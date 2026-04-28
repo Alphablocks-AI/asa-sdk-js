@@ -3,6 +3,61 @@ import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
 import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
 
+/** px scroll delta on the host page before we tell the iframe to dismiss a mobile nudge */
+const MOBILE_NUDGE_SCROLL_DISMISS_DELTA_PX = 10;
+
+let mobileNudgeScrollCleanup: (() => void) | null = null;
+
+function teardownMobileNudgeScrollDismiss(): void {
+  if (mobileNudgeScrollCleanup) {
+    mobileNudgeScrollCleanup();
+    mobileNudgeScrollCleanup = null;
+  }
+}
+
+/**
+ * Mobile floating nudge (`mobileNudgeView`): shopper scrolls the host page, not the iframe.
+ * postMessage targetOrigin uses the iframe’s loaded URL so local dev works even if SDK_URL differs at build time.
+ */
+function getIframePostMessageTarget(iframe: HTMLIFrameElement): string {
+  try {
+    return new URL(iframe.src).origin;
+  } catch {
+    return "*";
+  }
+}
+
+function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFrameElement): void {
+  teardownMobileNudgeScrollDismiss();
+
+  if (properties.event !== "mobileNudgeView" || window.innerWidth > 500) {
+    return;
+  }
+
+  const scrollRoot = document.scrollingElement ?? document.documentElement;
+  const initialY = window.scrollY ?? scrollRoot.scrollTop ?? 0;
+  const targetOrigin = getIframePostMessageTarget(iframe);
+
+  const onScroll = (): void => {
+    const y = window.scrollY ?? scrollRoot.scrollTop ?? 0;
+    if (Math.abs(y - initialY) < MOBILE_NUDGE_SCROLL_DISMISS_DELTA_PX) return;
+    if (!iframe.contentWindow) return;
+    iframe.contentWindow.postMessage(
+      { type: "alphablocks-dismiss-nudge-on-scroll", data: {} },
+      targetOrigin,
+    );
+    teardownMobileNudgeScrollDismiss();
+  };
+
+  // Capture: nested scroll containers (overflow regions) still notify during capture phase.
+  window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+  document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+  mobileNudgeScrollCleanup = () => {
+    window.removeEventListener("scroll", onScroll, { capture: true });
+    document.removeEventListener("scroll", onScroll, { capture: true });
+  };
+}
+
 export function createIFrame(
   token: string,
   theme: string,
@@ -14,7 +69,7 @@ export function createIFrame(
   const assistantName = name || "";
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
-  iframe.src = `${CHATBOT_URL}/?token=${token}&version=${version}&theme=${theme}`;
+  iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(token)}&version=${version}&theme=${encodeURIComponent(theme || "")}`;
   iframe.style.width = version === 1 ? width : "562px";
   iframe.style.height = version === 1 ? "60px" : "545px";
   iframe.style.border = "none";
@@ -105,6 +160,8 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     wrapperDiv.style.width = "100%";
     wrapperDiv.style.height = "100%";
   }
+
+  syncMobileNudgeScrollDismiss(properties, iframe);
 }
 
 export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): void {
@@ -117,6 +174,7 @@ export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): voi
 }
 
 export function hideIframe(iframe: HTMLIFrameElement | null): void {
+  teardownMobileNudgeScrollDismiss();
   if (!iframe) return;
   iframe.style.display = "none";
   const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
