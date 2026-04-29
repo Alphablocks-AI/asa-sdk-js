@@ -28,6 +28,7 @@ import {
 } from "./utils/iframe.ts";
 import {
   installShopifyCartFetchBridge,
+  onCartBridgeIframeMounted,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
 
@@ -208,11 +209,14 @@ export class AlphaBlocks {
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
+      onCartBridgeIframeMounted(iframe);
       return;
     }
 
     iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(this.token)}&version=1&theme=${encodeURIComponent(this.assistantTheme || "")}`;
     iframe.style.display = "block";
+    this.iframe = iframe;
+    onCartBridgeIframeMounted(iframe);
   }
 
   public async renderWrapper(): Promise<void> {
@@ -252,8 +256,11 @@ export class AlphaBlocks {
       element.style.zIndex = "2147480000";
       element.appendChild(iframe);
       this.iframe = iframe;
+      onCartBridgeIframeMounted(iframe);
     } else {
       iframe.style.display = "block";
+      this.iframe = iframe;
+      onCartBridgeIframeMounted(iframe);
     }
 
     if (this.assistantId && this.endUserId) {
@@ -265,6 +272,7 @@ export class AlphaBlocks {
     const iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
     iframe.style.display = "none";
     this.iframe = iframe;
+    onCartBridgeIframeMounted(iframe);
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     element.style.zIndex = "2147480000";
     element.appendChild(iframe);

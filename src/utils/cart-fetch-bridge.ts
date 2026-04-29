@@ -27,13 +27,58 @@ function getChatbotTargetOrigin(iframe: HTMLIFrameElement): string {
   }
 }
 
-function postCartLineToWidget(payload: UnknownRecord): void {
-  const iframe = resolveIframe();
-  if (!iframe?.contentWindow) return;
-  iframe.contentWindow.postMessage(
+/** Cart-line events while the widget iframe is not mounted yet (or not loaded) — replay when ready. */
+const PENDING_CART_LINE_MAX = 25;
+let pendingCartLineMessages: UnknownRecord[] = [];
+
+function postCartLineToWidgetInternal(iframe: HTMLIFrameElement, payload: UnknownRecord): void {
+  iframe.contentWindow!.postMessage(
     { type: ALPHABLOCKS_SHOPIFY_CART_LINE_MESSAGE, data: payload },
     getChatbotTargetOrigin(iframe),
   );
+}
+
+/**
+ * Deliver any cart-line payloads that were queued before `iframe.contentWindow` existed.
+ * Call when assigning the iframe and on its `load` (widget may not listen until after load).
+ */
+export function flushPendingCartLineMessagesToWidget(): void {
+  const iframe = resolveIframe();
+  if (!iframe?.contentWindow || pendingCartLineMessages.length === 0) return;
+  const batch = pendingCartLineMessages;
+  pendingCartLineMessages = [];
+  for (const payload of batch) {
+    postCartLineToWidgetInternal(iframe, payload);
+  }
+}
+
+const cartBridgeLoadIframes = new WeakSet<HTMLIFrameElement>();
+
+/**
+ * Register load + delayed flush so messages are not lost if they fire before the widget bundle attaches `message`.
+ * Listener remains attached for later `src` changes.
+ */
+export function onCartBridgeIframeMounted(iframe: HTMLIFrameElement | null): void {
+  if (!iframe) return;
+  flushPendingCartLineMessagesToWidget();
+  if (cartBridgeLoadIframes.has(iframe)) return;
+  cartBridgeLoadIframes.add(iframe);
+  iframe.addEventListener("load", () => {
+    flushPendingCartLineMessagesToWidget();
+    window.setTimeout(() => flushPendingCartLineMessagesToWidget(), 60);
+  });
+}
+
+function postCartLineToWidget(payload: UnknownRecord): void {
+  const iframe = resolveIframe();
+  if (!iframe?.contentWindow) {
+    if (pendingCartLineMessages.length >= PENDING_CART_LINE_MAX) {
+      pendingCartLineMessages.shift();
+    }
+    pendingCartLineMessages.push(payload);
+    return;
+  }
+  postCartLineToWidgetInternal(iframe, payload);
 }
 
 function isRecord(v: unknown): v is UnknownRecord {
@@ -88,6 +133,39 @@ function findRemovedLines(
 ): UnknownRecord[] {
   const nextKeys = new Set((nextItems ?? []).map(lineKey));
   return (prevItems ?? []).filter((line) => !nextKeys.has(lineKey(line)));
+}
+
+/**
+ * Detect removals even when `/cart/change.js` decrements quantity but keeps the same line key.
+ * Shopify often returns the updated full cart without a deleted line for quantity decrements.
+ */
+function findRemovedOrDecrementedLine(
+  prevItems: UnknownRecord[] | undefined,
+  nextItems: UnknownRecord[] | undefined,
+): UnknownRecord | null {
+  const prev = prevItems ?? [];
+  const next = nextItems ?? [];
+  const nextByKey = new Map<string, UnknownRecord>();
+  for (const line of next) {
+    nextByKey.set(lineKey(line), line);
+  }
+
+  for (const prevLine of prev) {
+    const key = lineKey(prevLine);
+    const nextLine = nextByKey.get(key);
+    if (!nextLine) return prevLine;
+
+    const prevQty =
+      typeof prevLine.quantity === "number" ? prevLine.quantity : Number(prevLine.quantity ?? 0);
+    const nextQty =
+      typeof nextLine.quantity === "number" ? nextLine.quantity : Number(nextLine.quantity ?? 0);
+
+    if (nextQty < prevQty) {
+      return prevLine;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -213,11 +291,12 @@ async function onFetchSettled(
     const newCart = parsed;
     const nextItems = (newCart.items as UnknownRecord[]) ?? [];
     const removed = findRemovedLines(prevItems, nextItems);
+    const removedOrDecremented =
+      removed.length > 0 ? removed[0] : findRemovedOrDecrementedLine(prevItems, nextItems);
     cartSnapshotCache = newCart;
 
-    if (removed.length === 0) return;
-
-    const line = removed[0];
+    if (!removedOrDecremented) return;
+    const line = removedOrDecremented;
     postCartLineToWidget({
       ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
       cart: newCart,
