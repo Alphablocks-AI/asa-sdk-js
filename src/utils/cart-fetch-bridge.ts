@@ -297,12 +297,21 @@ async function onFetchSettled(
 
     const linesToNotify = [...removed, ...decremented];
     if (linesToNotify.length === 0) return;
-    for (const line of linesToNotify) {
-      postCartLineToWidget({
-        ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
-        cart: newCart,
-      });
+
+    const linePayloads = linesToNotify.map((line) =>
+      payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
+    );
+    if (linePayloads.length === 1) {
+      postCartLineToWidget({ ...linePayloads[0]!, cart: newCart });
+      return;
     }
+    const first = linePayloads[0]!;
+    postCartLineToWidget({
+      ...first,
+      cart: newCart,
+      cart_line_batch: true,
+      removed_line_payloads: linePayloads,
+    });
   }
 }
 
