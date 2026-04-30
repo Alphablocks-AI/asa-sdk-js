@@ -1,10 +1,12 @@
-import { ALPHABLOCKS_WRAPPER_ID, CHATBOT_URL } from "../constants/index.ts";
+import {
+  ALPHABLOCKS_WRAPPER_ID,
+  CHATBOT_URL,
+  EMBED_MOBILE_MAX_INNER_WIDTH_PX,
+  MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX,
+} from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
 import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
-
-/** px scroll delta on the host page before we tell the iframe to dismiss a mobile nudge */
-const MOBILE_NUDGE_SCROLL_DISMISS_DELTA_PX = 10;
 
 let mobileNudgeScrollCleanup: (() => void) | null = null;
 
@@ -30,7 +32,10 @@ function getIframePostMessageTarget(iframe: HTMLIFrameElement): string {
 function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFrameElement): void {
   teardownMobileNudgeScrollDismiss();
 
-  if (properties.event !== "mobileNudgeView" || window.innerWidth > 500) {
+  if (
+    properties.event !== "mobileNudgeView" ||
+    window.innerWidth > EMBED_MOBILE_MAX_INNER_WIDTH_PX
+  ) {
     return;
   }
 
@@ -40,7 +45,7 @@ function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFr
 
   const onScroll = (): void => {
     const y = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-    if (Math.abs(y - initialY) < MOBILE_NUDGE_SCROLL_DISMISS_DELTA_PX) return;
+    if (Math.abs(y - initialY) < MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX) return;
     if (!iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
       { type: "alphablocks-dismiss-nudge-on-scroll", data: {} },

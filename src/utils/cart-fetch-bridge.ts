@@ -101,10 +101,11 @@ function lineKey(line: UnknownRecord): string {
 function handleFromProductUrl(url: string | undefined): string | undefined {
   if (!url || typeof url !== "string") return undefined;
   try {
-    const href = url.includes("://")
-      ? url
-      : `https://shop.example${url.startsWith("/") ? "" : "/"}${url}`;
-    const u = new URL(href);
+    const baseUrl =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "https://shop.example";
+    const u = new URL(url, baseUrl);
     const m = u.pathname.match(/\/products\/([^/?]+)/);
     return m?.[1];
   } catch {
@@ -136,13 +137,13 @@ function findRemovedLines(
 }
 
 /**
- * Detect removals even when `/cart/change.js` decrements quantity but keeps the same line key.
- * Shopify often returns the updated full cart without a deleted line for quantity decrements.
+ * Lines still present after `/cart/change.js` or `/cart/update.js` but with a lower quantity
+ * (same line key). Fully removed lines are excluded — use `findRemovedLines` for those.
  */
-function findRemovedOrDecrementedLine(
+function findQuantityDecrementedLines(
   prevItems: UnknownRecord[] | undefined,
   nextItems: UnknownRecord[] | undefined,
-): UnknownRecord | null {
+): UnknownRecord[] {
   const prev = prevItems ?? [];
   const next = nextItems ?? [];
   const nextByKey = new Map<string, UnknownRecord>();
@@ -150,10 +151,11 @@ function findRemovedOrDecrementedLine(
     nextByKey.set(lineKey(line), line);
   }
 
+  const out: UnknownRecord[] = [];
   for (const prevLine of prev) {
     const key = lineKey(prevLine);
     const nextLine = nextByKey.get(key);
-    if (!nextLine) return prevLine;
+    if (!nextLine) continue;
 
     const prevQty =
       typeof prevLine.quantity === "number" ? prevLine.quantity : Number(prevLine.quantity ?? 0);
@@ -161,11 +163,10 @@ function findRemovedOrDecrementedLine(
       typeof nextLine.quantity === "number" ? nextLine.quantity : Number(nextLine.quantity ?? 0);
 
     if (nextQty < prevQty) {
-      return prevLine;
+      out.push(prevLine);
     }
   }
-
-  return null;
+  return out;
 }
 
 /**
@@ -291,16 +292,17 @@ async function onFetchSettled(
     const newCart = parsed;
     const nextItems = (newCart.items as UnknownRecord[]) ?? [];
     const removed = findRemovedLines(prevItems, nextItems);
-    const removedOrDecremented =
-      removed.length > 0 ? removed[0] : findRemovedOrDecrementedLine(prevItems, nextItems);
+    const decremented = findQuantityDecrementedLines(prevItems, nextItems);
     cartSnapshotCache = newCart;
 
-    if (!removedOrDecremented) return;
-    const line = removedOrDecremented;
-    postCartLineToWidget({
-      ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
-      cart: newCart,
-    });
+    const linesToNotify = [...removed, ...decremented];
+    if (linesToNotify.length === 0) return;
+    for (const line of linesToNotify) {
+      postCartLineToWidget({
+        ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
+        cart: newCart,
+      });
+    }
   }
 }
 
