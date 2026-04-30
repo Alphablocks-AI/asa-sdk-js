@@ -12,6 +12,29 @@ export async function getEndUser(assistantId: number, endUserId: string) {
   }
 }
 
+export async function getSessionDetails(assistantId: number, token: string, sessionId: string) {
+  try {
+    const response = await fetch(
+      `${API_URL}/chat/widget/session-details/?assistant_id=${assistantId}&session_id=${sessionId}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          assistant_id: assistantId,
+          session_id: sessionId,
+        }),
+      },
+    );
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching session details:", error);
+    return null;
+  }
+}
+
 export async function getAssistantDetails(token: string) {
   try {
     const response = await fetch(

@@ -4,7 +4,7 @@ import {
   ASSISTANT_DETAILS_STORAGE_KEY,
 } from "./constants/index.ts";
 import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
-import { getAssistantDetails, getEndUser } from "./utils/api.ts";
+import { getAssistantDetails, getEndUser, getSessionDetails } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
 import {
   createWrapper,
@@ -101,25 +101,66 @@ export class AlphaBlocks {
   private handleSessionCookie(): void {
     if (!this.token) return;
 
-    let isExisted = true;
-    let sessionCookie = getCookie(`alphablocks-sessionId-${this.token}`);
+    void this.resolveAndSendSessionCookie();
+  }
 
-    if (sessionCookie === "28ab532d") {
+  private async resolveAndSendSessionCookie(): Promise<void> {
+    const cookieName = `alphablocks-sessionId-${this.token}`;
+    const existingCookie = getCookie(cookieName);
+    const hasValidExistingCookie = Boolean(existingCookie && existingCookie !== "28ab532d");
+    const url = new URL(window.location.href);
+    const endUserIdFromParams = (url.searchParams.get("asa_end_user_id") || "").trim();
+    const sessionIdFromParams = (url.searchParams.get("asa_web_session_id") || "").trim();
+
+    let isExisted = hasValidExistingCookie;
+    let resolvedEndUserId = existingCookie;
+    let preferredSessionId = "";
+
+    if (!hasValidExistingCookie) {
       isExisted = false;
-      sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
+      if (endUserIdFromParams) {
+        resolvedEndUserId = endUserIdFromParams;
+        setCookie(cookieName, "cart", endUserIdFromParams);
+        if (sessionIdFromParams) {
+          preferredSessionId = sessionIdFromParams;
+        }
+      } else {
+        resolvedEndUserId = setCookie(cookieName, "sessionId");
+      }
+    } else if (endUserIdFromParams && sessionIdFromParams) {
+      const isSameAsCookie = existingCookie === endUserIdFromParams;
+      const isParamPairValid = await this.isSessionOwnedByEndUser(
+        sessionIdFromParams,
+        endUserIdFromParams,
+      );
+      if (isSameAsCookie || isParamPairValid) {
+        resolvedEndUserId = endUserIdFromParams;
+        preferredSessionId = sessionIdFromParams;
+      } else {
+        resolvedEndUserId = existingCookie;
+      }
+    } else if (endUserIdFromParams && !sessionIdFromParams) {
+      resolvedEndUserId = existingCookie;
     }
 
-    if (!sessionCookie) {
-      isExisted = false;
-      sessionCookie = setCookie(`alphablocks-sessionId-${this.token}`, "sessionId");
-    }
-    console.log("this.userId", this.userId);
-    this.endUserId = sessionCookie;
+    this.endUserId = resolvedEndUserId;
     sendCookie(
-      { sessionCookie, cookieIsExisted: isExisted, userId: this.userId },
+      {
+        sessionCookie: resolvedEndUserId,
+        cookieIsExisted: isExisted,
+        userId: this.userId,
+        preferredSessionId,
+      },
       this.iframe,
       "session-cookie",
     );
+  }
+
+  private async isSessionOwnedByEndUser(sessionId: string, endUserId: string): Promise<boolean> {
+    if (!sessionId || !endUserId || !this.assistantId) return false;
+    const sessionData = await getSessionDetails(this.assistantId, this.token, sessionId);
+    const beEndUserId = sessionData?.data?.session_details?.end_user_id || "";
+    return beEndUserId === endUserId;
   }
 
   private handleCartCookie(event: string, data: EventDataType): void {
