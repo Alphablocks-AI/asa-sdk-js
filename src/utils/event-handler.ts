@@ -49,14 +49,33 @@ export async function refreshCartUI(): Promise<void> {
 // 🔹 1. Get cart details (returns cart in message)
 export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
   if (!iframe || !iframe.contentWindow) return;
-  const cart = await getCart();
-  iframe.contentWindow.postMessage(
-    {
-      type: CART_DETAILS_RESPONSE,
-      data: cart,
-    },
-    "*",
-  );
+  try {
+    const cart = await getCart();
+    iframe.contentWindow.postMessage(
+      {
+        type: CART_DETAILS_RESPONSE,
+        data: cart,
+      },
+      "*",
+    );
+  } catch (err) {
+    console.error("handleGetCartDetails error:", err);
+    iframe.contentWindow.postMessage(
+      {
+        type: CART_DETAILS_RESPONSE,
+        data: {
+          items: [],
+          item_count: 0,
+          total_price: 0,
+          items_subtotal_price: 0,
+          discount_codes: [],
+          cart_level_discount_applications: [],
+          attributes: {},
+        },
+      },
+      "*",
+    );
+  }
 }
 
 // 🔹 2. Update only attributes (no response returned)
