@@ -322,6 +322,7 @@ async function onFetchSettled(
  */
 export function installShopifyCartFetchBridge(): void {
   if (typeof window === "undefined" || patched) return;
+  if (typeof window.fetch !== "function") return;
   patched = true;
   innerFetch = window.fetch.bind(window);
 
