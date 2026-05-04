@@ -14,10 +14,9 @@
  *   ></script>
  *
  * Usage (Production - use embed.js instead):
- *   <script
- *     src="https://unpkg.com/asa-sdk@latest/embed.js"
- *     data-token="pk_your_token_here"
- *   ></script>
+ *   <script defer src="https://unpkg.com/asa-sdk@latest/embed.js" data-token="pk_..."></script>
+ *
+ * Beta: <script defer src="https://unpkg.com/asa-sdk@next/embed.js" data-token="pk_..."></script>
  *
  * OR set token globally before loading:
  *   <script>
@@ -34,32 +33,63 @@
     window.location.hostname === "127.0.0.1" ||
     window.location.protocol === "file:";
 
+  function defaultSdkUrlFromCurrentScript() {
+    try {
+      const src =
+        typeof document !== "undefined" && document.currentScript && document.currentScript.src;
+      if (src && /\/embed-dev\.js(\?|#|$)/i.test(src)) {
+        return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, "/dist-dev/index.umd.js$1");
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
   // Default to local dist-dev path, allow override
   const SDK_URL =
     window.ALPHABLOCKS_SDK_URL ||
     (isLocal
       ? "http://127.0.0.1:5500/dist-dev/index.umd.js"
-      : "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js");
+      : defaultSdkUrlFromCurrentScript() ||
+        "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js");
+  const EMBED_GUARD_KEY = "__ALPHABLOCKS_EMBED_INITIALIZED__";
+
+  function normalizeToken(rawToken) {
+    if (typeof rawToken !== "string") return null;
+    const token = rawToken.trim();
+    if (!token || token === "undefined" || token === "null") return null;
+    return token;
+  }
 
   /**
    * Get token from script tag data attribute or global variable
    */
   function getToken() {
-    // Method 1: Get from script tag data-token attribute
+    // Method 1 (new usage): use current script's data-token when available.
+    const currentScriptToken =
+      typeof document !== "undefined" && document.currentScript
+        ? normalizeToken(document.currentScript.getAttribute("data-token"))
+        : null;
+    if (currentScriptToken) return currentScriptToken;
+
+    // Method 2 (legacy usage): scan embed script tags for data-token.
     const scripts = document.querySelectorAll('script[src*="embed"]');
     for (let i = 0; i < scripts.length; i++) {
-      const token = scripts[i].getAttribute("data-token");
+      const token = normalizeToken(scripts[i].getAttribute("data-token"));
       if (token) return token;
     }
 
-    // Method 2: Get from global variable
-    if (typeof window !== "undefined" && window.ALPHABLOCKS_TOKEN) {
-      return window.ALPHABLOCKS_TOKEN;
+    // Method 3 (legacy usage): get from global variable.
+    if (typeof window !== "undefined") {
+      const globalToken = normalizeToken(window.ALPHABLOCKS_TOKEN);
+      if (globalToken) return globalToken;
     }
 
-    // Method 3: Get from window.alphablocksConfig
-    if (typeof window !== "undefined" && window.alphablocksConfig?.token) {
-      return window.alphablocksConfig.token;
+    // Method 4 (new usage): get from window.alphablocksConfig.
+    if (typeof window !== "undefined") {
+      const configToken = normalizeToken(window.alphablocksConfig?.token);
+      if (configToken) return configToken;
     }
 
     return null;
@@ -78,9 +108,7 @@
 
     try {
       const assistant = new window.AlphaBlocks({ token: token });
-      // renderWrapper() is async, so we await it before showing assistant
       await assistant.renderWrapper();
-      // showAssistant() is synchronous, so no await needed
       assistant.showAssistant();
     } catch (error) {
       console.error("AlphaBlocks: Failed to initialize widget", error);
@@ -129,11 +157,23 @@
     (document.head || document.body || document.documentElement).appendChild(script);
   }
 
+  function scheduleLoadSDK(token) {
+    function run() {
+      loadSDK(token);
+    }
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(run, { timeout: 2000 });
+    } else {
+      setTimeout(run, 0);
+    }
+  }
+
   /**
    * Initialize when DOM is ready
    */
   function init() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
+    if (window[EMBED_GUARD_KEY]) return;
 
     const token = getToken();
 
@@ -143,11 +183,12 @@
       );
       return;
     }
+    window[EMBED_GUARD_KEY] = true;
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => loadSDK(token));
+      document.addEventListener("DOMContentLoaded", () => scheduleLoadSDK(token));
     } else {
-      loadSDK(token);
+      scheduleLoadSDK(token);
     }
   }
 

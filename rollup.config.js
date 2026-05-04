@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 import typescript from "@rollup/plugin-typescript";
+import terser from "@rollup/plugin-terser";
 import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
@@ -35,6 +36,7 @@ const config = {
       "process.env.API_URL": JSON.stringify(API_URL),
     }),
     typescript(),
+    ...(isDev ? [] : [terser({ format: { comments: false } })]),
     copy({
       targets: [
         { src: "src/styles.css", dest: outputDir },

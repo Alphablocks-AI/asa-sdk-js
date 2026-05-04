@@ -181,7 +181,24 @@ export class AlphaBlocks {
     if (event === "alphablocks-store-cart-cookie") {
       setCookie("cart", "cart", data.cart);
       setCookie("cart_sig", "cart", data.cart_sig);
-      document.location.reload();
+      window.dispatchEvent(
+        new CustomEvent("alphablocks-cart-cookies-updated", {
+          detail: { cart: data.cart, cart_sig: data.cart_sig },
+        }),
+      );
+      if (window.alphablocksConfig?.reloadOnCartCookieStore) {
+        document.location.reload();
+      }
+    }
+  }
+
+  private async hydrateAssistantDetails(storageKey: string): Promise<void> {
+    const data = await getAssistantDetails(this.token);
+    if (data && data.data?.assistant_details) {
+      this.assistantName = data.data.name;
+      this.assistantId = data.data.id;
+      sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
+      updateWrapperProperties(data.data.assistant_details);
     }
   }
 
@@ -266,22 +283,21 @@ export class AlphaBlocks {
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
     const cachedAssistantDetails = sessionStorage.getItem(storageKey);
     if (cachedAssistantDetails) {
-      const parsedAssistantDetails = JSON.parse(cachedAssistantDetails);
-      if (parsedAssistantDetails) {
-        this.assistantName = parsedAssistantDetails.name;
-        this.assistantId = parsedAssistantDetails.id;
-        updateWrapperProperties(parsedAssistantDetails);
-        return;
+      try {
+        const parsedAssistantDetails = JSON.parse(cachedAssistantDetails);
+        if (parsedAssistantDetails) {
+          this.assistantName = parsedAssistantDetails.name;
+          this.assistantId = parsedAssistantDetails.id;
+          updateWrapperProperties(parsedAssistantDetails);
+        }
+      } catch {
+        sessionStorage.removeItem(storageKey);
+        void this.hydrateAssistantDetails(storageKey);
       }
+      return;
     }
 
-    const data = await getAssistantDetails(this.token);
-    if (data && data.data?.assistant_details) {
-      this.assistantName = data.data.name;
-      this.assistantId = data.data.id;
-      sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
-      updateWrapperProperties(data.data.assistant_details);
-    }
+    void this.hydrateAssistantDetails(storageKey);
   }
 
   public addCustomCSS(props: CustomCSSProperties): void {

@@ -1,3 +1,13 @@
+declare global {
+  interface Window {
+    alphablocksConfig?: {
+      token?: string;
+      /** @default false. Set true to restore previous full-page reload after cart cookies are stored (Shopify compatibility). */
+      reloadOnCartCookieStore?: boolean;
+    };
+  }
+}
+
 export interface AlphaBlocksConstructor {
   token: string;
   name?: string;
