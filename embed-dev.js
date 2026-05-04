@@ -18,6 +18,8 @@
  *
  * Beta: <script defer src="https://unpkg.com/asa-sdk@next/embed.js" data-token="pk_..."></script>
  *
+ * Optional user id: data-user-id on this script, or window.alphablocksConfig.userId / window.ALPHABLOCKS_USER_ID.
+ *
  * OR set token globally before loading:
  *   <script>
  *     window.ALPHABLOCKS_TOKEN = "pk_your_token_here";
@@ -62,6 +64,18 @@
     return token;
   }
 
+  function normalizeUserId(raw) {
+    if (raw == null || raw === false) return undefined;
+    if (typeof raw === "number") {
+      if (Number.isNaN(raw)) return undefined;
+      return String(raw);
+    }
+    if (typeof raw !== "string") return undefined;
+    const s = raw.trim();
+    if (!s || s === "undefined" || s === "null") return undefined;
+    return s;
+  }
+
   /**
    * Get token from script tag data attribute or global variable
    */
@@ -96,9 +110,35 @@
   }
 
   /**
+   * Optional user id — same sources as embed.js (dev scans script[src*="embed"]).
+   */
+  function getUserId() {
+    const fromCurrent =
+      typeof document !== "undefined" && document.currentScript
+        ? normalizeUserId(document.currentScript.getAttribute("data-user-id"))
+        : undefined;
+    if (fromCurrent) return fromCurrent;
+
+    const scripts = document.querySelectorAll('script[src*="embed"]');
+    for (let i = 0; i < scripts.length; i++) {
+      const uid = normalizeUserId(scripts[i].getAttribute("data-user-id"));
+      if (uid) return uid;
+    }
+
+    if (typeof window !== "undefined") {
+      const g = normalizeUserId(window.ALPHABLOCKS_USER_ID);
+      if (g) return g;
+      const c = normalizeUserId(window.alphablocksConfig?.userId);
+      if (c) return c;
+    }
+
+    return undefined;
+  }
+
+  /**
    * Initialize and show the widget
    */
-  async function initWidget(token) {
+  async function initWidget(token, userId) {
     if (!window.AlphaBlocks || !token) {
       console.error(
         'AlphaBlocks: Token is required. Add data-token="pk_xxx" to script tag or set window.ALPHABLOCKS_TOKEN',
@@ -107,7 +147,9 @@
     }
 
     try {
-      const assistant = new window.AlphaBlocks({ token: token });
+      const props = { token: token };
+      if (userId) props.userId = userId;
+      const assistant = new window.AlphaBlocks(props);
       await assistant.renderWrapper();
       assistant.showAssistant();
     } catch (error) {
@@ -118,11 +160,11 @@
   /**
    * Load SDK script if not already loaded
    */
-  function loadSDK(token) {
+  function loadSDK(token, userId) {
     // Check if SDK is already loaded
     if (window.AlphaBlocks) {
       // initWidget is async, but we don't need to await it here
-      initWidget(token).catch((error) => {
+      initWidget(token, userId).catch((error) => {
         console.error("AlphaBlocks: Failed to initialize widget", error);
       });
       return;
@@ -133,7 +175,7 @@
     if (existingScript) {
       // Wait for it to load
       existingScript.addEventListener("load", () => {
-        initWidget(token).catch((error) => {
+        initWidget(token, userId).catch((error) => {
           console.error("AlphaBlocks: Failed to initialize widget", error);
         });
       });
@@ -145,7 +187,7 @@
     script.src = SDK_URL;
     script.async = true;
     script.onload = () => {
-      initWidget(token).catch((error) => {
+      initWidget(token, userId).catch((error) => {
         console.error("AlphaBlocks: Failed to initialize widget", error);
       });
     };
@@ -157,9 +199,9 @@
     (document.head || document.body || document.documentElement).appendChild(script);
   }
 
-  function scheduleLoadSDK(token) {
+  function scheduleLoadSDK(token, userId) {
     function run() {
-      loadSDK(token);
+      loadSDK(token, userId);
     }
     if (typeof requestIdleCallback === "function") {
       requestIdleCallback(run, { timeout: 2000 });
@@ -176,6 +218,7 @@
     if (window[EMBED_GUARD_KEY]) return;
 
     const token = getToken();
+    const userId = getUserId();
 
     if (!token) {
       console.error(
@@ -186,9 +229,9 @@
     window[EMBED_GUARD_KEY] = true;
 
     if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", () => scheduleLoadSDK(token));
+      document.addEventListener("DOMContentLoaded", () => scheduleLoadSDK(token, userId));
     } else {
-      scheduleLoadSDK(token);
+      scheduleLoadSDK(token, userId);
     }
   }
 
