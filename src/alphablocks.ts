@@ -24,6 +24,7 @@ import {
   hideIframe,
   sendOriginalWindowMessage,
   sendParentUrlParams,
+  setIframeAccessibleTitle,
   setIframeSize,
 } from "./utils/iframe.ts";
 import {
@@ -199,6 +200,9 @@ export class AlphaBlocks {
       this.assistantId = data.data.id;
       sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
       updateWrapperProperties(data.data.assistant_details);
+      if (this.iframe) {
+        setIframeAccessibleTitle(this.iframe, this.assistantName);
+      }
     }
   }
 
@@ -272,6 +276,7 @@ export class AlphaBlocks {
     }
 
     iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(this.token)}&version=1&theme=${encodeURIComponent(this.assistantTheme || "")}`;
+    setIframeAccessibleTitle(iframe, this.assistantName);
     iframe.style.display = "block";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
@@ -289,6 +294,9 @@ export class AlphaBlocks {
           this.assistantName = parsedAssistantDetails.name;
           this.assistantId = parsedAssistantDetails.id;
           updateWrapperProperties(parsedAssistantDetails);
+          if (this.iframe) {
+            setIframeAccessibleTitle(this.iframe, this.assistantName);
+          }
         }
       } catch {
         sessionStorage.removeItem(storageKey);
@@ -315,6 +323,7 @@ export class AlphaBlocks {
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
     } else {
+      setIframeAccessibleTitle(iframe, this.assistantName);
       iframe.style.display = "block";
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
