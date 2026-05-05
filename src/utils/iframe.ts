@@ -63,6 +63,11 @@ function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFr
   };
 }
 
+export function setIframeAccessibleTitle(iframe: HTMLIFrameElement, assistantName: string): void {
+  const label = (assistantName || "").trim();
+  iframe.title = label ? `AlphaBlocks chat — ${label}` : "AlphaBlocks chat assistant";
+}
+
 export function createIFrame(
   token: string,
   theme: string,
@@ -80,6 +85,7 @@ export function createIFrame(
   iframe.style.border = "none";
   iframe.style.background = "transparent";
   iframe.allow = "microphone";
+  setIframeAccessibleTitle(iframe, assistantName);
   return iframe;
 }
 

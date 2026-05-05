@@ -85,10 +85,14 @@ function isRecord(v: unknown): v is UnknownRecord {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-/** Shopify GET /cart.js (and change/update) shape. */
-function isFullCartJson(v: unknown): v is UnknownRecord {
+/** Shopify GET /cart.js (and change/update) body shape — boolean only for safe narrowing elsewhere. */
+function isFullCartJson(v: unknown): boolean {
   if (!isRecord(v)) return false;
   return Array.isArray(v.items) && typeof v.item_count === "number";
+}
+
+function asFullCart(v: unknown): UnknownRecord | null {
+  return isFullCartJson(v) ? (v as UnknownRecord) : null;
 }
 
 function lineKey(line: UnknownRecord): string {
@@ -118,7 +122,9 @@ function payloadFromLine(line: UnknownRecord, eventName: CartAjaxEventName): Unk
   return {
     event_name: eventName,
     product_id: productId !== undefined && productId !== null ? String(productId) : "",
-    product_title: String(line.product_title ?? line.title ?? ""),
+    product_title: String(
+      line.product_title ?? line.title ?? line.untranslated_product_title ?? "",
+    ),
     product_url_handle:
       line.handle !== undefined && line.handle !== null
         ? String(line.handle)
@@ -174,14 +180,13 @@ function findQuantityDecrementedLines(
  * Returns a full /cart.js-shaped object when possible.
  */
 async function resolveFullCartAfterAdd(parsed: unknown): Promise<UnknownRecord | null> {
-  if (isFullCartJson(parsed)) {
-    return parsed;
-  }
+  const full = asFullCart(parsed);
+  if (full) return full;
   try {
     const r = await innerFetch("/cart.js", { headers: { Accept: "application/json" } });
     if (!r.ok) return null;
     const j: unknown = await r.json();
-    return isFullCartJson(j) ? j : null;
+    return asFullCart(j);
   } catch {
     return null;
   }
@@ -250,6 +255,85 @@ function methodFromInit(input: FetchInput, init?: FetchInit): string {
   return "GET";
 }
 
+function isCartAddPathname(pathname: string): boolean {
+  return (
+    pathname.endsWith("/cart/add.js") ||
+    pathname.endsWith("/cart/add.json") ||
+    pathname.endsWith("/cart/add")
+  );
+}
+
+function isCartChangePathname(pathname: string): boolean {
+  return (
+    pathname.endsWith("/cart/change.js") ||
+    pathname.endsWith("/cart/change.json") ||
+    pathname.endsWith("/cart/change") ||
+    pathname.endsWith("/cart/update.js") ||
+    pathname.endsWith("/cart/update.json") ||
+    pathname.endsWith("/cart/update")
+  );
+}
+
+async function fetchFreshCartJson(): Promise<UnknownRecord | null> {
+  try {
+    const r = await innerFetch("/cart.js", { headers: { Accept: "application/json" } });
+    if (!r.ok) return null;
+    const j: unknown = await r.json();
+    return asFullCart(j);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Section-style `change`/`update` bodies expose `items_removed` / `items_added`.
+ * When present, emit line events without relying on snapshot diff.
+ */
+async function tryNotifyCartChangeFromSectionPayload(parsed: UnknownRecord): Promise<boolean> {
+  const added = Array.isArray(parsed.items_added)
+    ? (parsed.items_added as unknown[]).filter(isRecord)
+    : [];
+  const removed = Array.isArray(parsed.items_removed)
+    ? (parsed.items_removed as unknown[]).filter(isRecord)
+    : [];
+  if (added.length === 0 && removed.length === 0) return false;
+
+  let cart = asFullCart(parsed);
+  if (!cart) {
+    cart = await fetchFreshCartJson();
+  }
+  if (!cart) return false;
+
+  cartSnapshotCache = cart;
+
+  for (const line of added) {
+    postCartLineToWidget({ ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_ADDED), cart });
+  }
+
+  if (removed.length === 1) {
+    postCartLineToWidget({
+      ...payloadFromLine(removed[0]!, CART_AJAX_EVENT.PRODUCT_REMOVED),
+      cart,
+    });
+    return true;
+  }
+
+  if (removed.length > 1) {
+    const linePayloads = removed.map((line) =>
+      payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_REMOVED),
+    );
+    const first = linePayloads[0]!;
+    postCartLineToWidget({
+      ...first,
+      cart,
+      cart_line_batch: true,
+      removed_line_payloads: linePayloads,
+    });
+  }
+
+  return true;
+}
+
 let cartSnapshotCache: UnknownRecord | null = null;
 
 async function onFetchSettled(
@@ -271,12 +355,15 @@ async function onFetchSettled(
   const pathname = pathnameFromFetchInput(input);
   const method = methodFromInit(input, init);
 
-  if (pathname.endsWith("/cart.js") && method === "GET" && isFullCartJson(parsed)) {
-    cartSnapshotCache = parsed;
+  if (pathname.endsWith("/cart.js") && method === "GET") {
+    const snap = asFullCart(parsed);
+    if (snap) {
+      cartSnapshotCache = snap;
+    }
     return;
   }
 
-  if (pathname.endsWith("/cart/add.js")) {
+  if (isCartAddPathname(pathname)) {
     const before = cartSnapshotCache;
     const fullCart = await resolveFullCartAfterAdd(parsed);
     if (!fullCart) return;
@@ -286,10 +373,13 @@ async function onFetchSettled(
     return;
   }
 
-  if (pathname.endsWith("/cart/change.js") || pathname.endsWith("/cart/update.js")) {
-    if (!isFullCartJson(parsed)) return;
+  if (isCartChangePathname(pathname)) {
+    if (isRecord(parsed) && (await tryNotifyCartChangeFromSectionPayload(parsed))) {
+      return;
+    }
+    const newCart = asFullCart(parsed);
+    if (!newCart) return;
     const prevItems = (cartSnapshotCache?.items as UnknownRecord[] | undefined) ?? [];
-    const newCart = parsed;
     const nextItems = (newCart.items as UnknownRecord[]) ?? [];
     const removed = findRemovedLines(prevItems, nextItems);
     const decremented = findQuantityDecrementedLines(prevItems, nextItems);
