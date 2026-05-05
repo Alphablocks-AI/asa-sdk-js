@@ -2,6 +2,12 @@
  * AlphaBlocks Widget Integration Script
  * Works in React, Next.js, and vanilla HTML
  *
+ * Lifecycle:
+ * - Initializes once per page load. A guard avoids double-init if this loader runs twice in the
+ *   same document (duplicate tags, dynamic re-insert). A full refresh loads a new document, so
+ *   initialization runs again as usual.
+ * - One store / site typically installs one widget (one public token).
+ *
  * Prefer placing before </body> with defer for minimal HTML parser blocking:
  *   <script defer src="https://unpkg.com/asa-sdk@latest/embed.js" data-token="pk_..."></script>
  *
@@ -28,9 +34,12 @@
 (function () {
   "use strict";
 
+  /** Only AlphaBlocks loader URLs (avoids matching unrelated scripts with "embed" in the path). */
+  const LOADER_SCRIPT_SELECTOR = 'script[src*="embed-dev.js"], script[src*="embed.js"]';
+
   /**
-   * When this file is served as .../embed.js (e.g. unpkg asa-sdk@next/embed.js), load the UMD
-   * from the same origin path (.../dist/index.umd.js) so @next and version pins stay consistent.
+   * When served as .../embed.js, load the UMD from the same base path (.../dist/index.umd.js)
+   * so npm dist-tags and version pins stay aligned with this file.
    */
   function defaultSdkUrlFromCurrentScript() {
     try {
@@ -39,18 +48,18 @@
       if (src && /\/embed\.js(\?|#|$)/i.test(src)) {
         return src.replace(/\/embed\.js((\?|#).*)?$/i, "/dist/index.umd.js$1");
       }
-    } catch (_e) {
-      /* ignore */
-      console.error("AlphaBlocks: Failed to get SDK URL from current script", _e);
+    } catch {
+      /* currentScript / URL resolution unavailable — use explicit SDK_URL or CDN default */
     }
     return null;
   }
 
-  // Production SDK URL (can be overridden with window.ALPHABLOCKS_SDK_URL)
   const SDK_URL =
     window.ALPHABLOCKS_SDK_URL ||
     defaultSdkUrlFromCurrentScript() ||
     "https://unpkg.com/asa-sdk@latest/dist/index.umd.js";
+
+  /** Ensures one init per document; cleared automatically on full page navigation / refresh. */
   const EMBED_GUARD_KEY = "__ALPHABLOCKS_EMBED_INITIALIZED__";
 
   function normalizeToken(rawToken) {
@@ -73,30 +82,26 @@
   }
 
   /**
-   * Get token from script tag data attribute or global variable
+   * Token resolution: currentScript (preferred), AlphaBlocks loader tags, globals, then config.
    */
   function getToken() {
-    // Method 1 (new usage): use current script's data-token when available.
     const currentScriptToken =
       typeof document !== "undefined" && document.currentScript
         ? normalizeToken(document.currentScript.getAttribute("data-token"))
         : null;
     if (currentScriptToken) return currentScriptToken;
 
-    // Method 2 (legacy usage): scan embed script tags for data-token.
-    const scripts = document.querySelectorAll('script[src*="embed.js"]');
+    const scripts = document.querySelectorAll(LOADER_SCRIPT_SELECTOR);
     for (let i = 0; i < scripts.length; i++) {
       const token = normalizeToken(scripts[i].getAttribute("data-token"));
       if (token) return token;
     }
 
-    // Method 3 (legacy usage): get from global variable.
     if (typeof window !== "undefined") {
       const globalToken = normalizeToken(window.ALPHABLOCKS_TOKEN);
       if (globalToken) return globalToken;
     }
 
-    // Method 4 (new usage): get from window.alphablocksConfig.
     if (typeof window !== "undefined") {
       const configToken = normalizeToken(window.alphablocksConfig?.token);
       if (configToken) return configToken;
@@ -106,7 +111,7 @@
   }
 
   /**
-   * Optional user id (e.g. Shopify customer id) — same precedence style as token where applicable.
+   * Optional user id (e.g. Shopify customer id); same order of precedence as getToken.
    */
   function getUserId() {
     const fromCurrent =
@@ -115,7 +120,7 @@
         : undefined;
     if (fromCurrent) return fromCurrent;
 
-    const scripts = document.querySelectorAll('script[src*="embed.js"]');
+    const scripts = document.querySelectorAll(LOADER_SCRIPT_SELECTOR);
     for (let i = 0; i < scripts.length; i++) {
       const uid = normalizeUserId(scripts[i].getAttribute("data-user-id"));
       if (uid) return uid;
@@ -157,19 +162,15 @@
    * Load SDK script if not already loaded
    */
   function loadSDK(token, userId) {
-    // Check if SDK is already loaded
     if (window.AlphaBlocks) {
-      // initWidget is async, but we don't need to await it here
       initWidget(token, userId).catch((error) => {
         console.error("AlphaBlocks: Failed to initialize widget", error);
       });
       return;
     }
 
-    // Check if script tag already exists
     const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
     if (existingScript) {
-      // Wait for it to load
       existingScript.addEventListener("load", () => {
         initWidget(token, userId).catch((error) => {
           console.error("AlphaBlocks: Failed to initialize widget", error);
@@ -178,7 +179,6 @@
       return;
     }
 
-    // Create and append script tag
     const script = document.createElement("script");
     script.src = SDK_URL;
     script.async = true;
@@ -191,7 +191,6 @@
       console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
     };
 
-    // Append to head or body
     (document.head || document.body || document.documentElement).appendChild(script);
   }
 
@@ -206,9 +205,6 @@
     }
   }
 
-  /**
-   * Initialize when DOM is ready
-   */
   function init() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     if (window[EMBED_GUARD_KEY]) return;
@@ -231,6 +227,5 @@
     }
   }
 
-  // Auto-initialize
   init();
 })();

@@ -297,11 +297,13 @@ export class AlphaBlocks {
           if (this.iframe) {
             setIframeAccessibleTitle(this.iframe, this.assistantName);
           }
+          return;
         }
       } catch {
-        sessionStorage.removeItem(storageKey);
-        void this.hydrateAssistantDetails(storageKey);
+        /* invalid JSON in sessionStorage */
       }
+      sessionStorage.removeItem(storageKey);
+      void this.hydrateAssistantDetails(storageKey);
       return;
     }
 
