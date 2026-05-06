@@ -418,7 +418,8 @@ export function installShopifyCartFetchBridge(): void {
 
   window.fetch = async (input: FetchInput, init?: FetchInit): Promise<Response> => {
     const response = await innerFetch(input, init);
-    void onFetchSettled(input, init, response).catch(() => {
+    /** Await so nested `/cart.js` during `/cart/add.js` updates `cartSnapshotCache` before callers continue — otherwise remove diffs see an empty snapshot. */
+    await onFetchSettled(input, init, response).catch(() => {
       /* ignore bridge errors — storefront fetch must not break */
     });
     return response;
