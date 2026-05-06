@@ -36,7 +36,15 @@ const config = {
       "process.env.API_URL": JSON.stringify(API_URL),
     }),
     typescript(),
-    ...(isDev ? [] : [terser({ format: { comments: false } })]),
+    ...(isDev
+      ? []
+      : [
+          terser({
+            format: { comments: false },
+            compress: { passes: 2, drop_console: true },
+            mangle: { toplevel: false },
+          }),
+        ]),
     copy({
       targets: [
         { src: "src/styles.css", dest: outputDir },
