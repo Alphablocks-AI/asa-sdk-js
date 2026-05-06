@@ -1,6 +1,6 @@
 {
   "name": "asa-sdk",
-  "version": "1.5.37-0",
+  "version": "1.5.38-0",
   "description": "This is a library for asa widget",
   "module": "dist/index.mjs",
   "main": "dist/index.cjs.js",
