@@ -15,6 +15,8 @@ export function getElement(container: string | HTMLElement): HTMLElement {
 }
 
 export function createWrapper(): void {
+  if (document.getElementById(ALPHABLOCKS_WRAPPER_ID)) return;
+
   const wrapperDiv = document.createElement("div");
   wrapperDiv.setAttribute("id", ALPHABLOCKS_WRAPPER_ID);
   wrapperDiv.style.position = "fixed";
