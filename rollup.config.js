@@ -3,12 +3,13 @@ import typescript from "@rollup/plugin-typescript";
 import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
-const isDev = process.env.SDK_URL.includes("dev-widget");
+const sdkUrl = process.env.SDK_URL ?? "";
+const isDev = sdkUrl.includes("localhost") || sdkUrl.includes("dev-widget");
 const outputDir = isDev ? "dist-dev" : "dist";
 
-const API_URL = isDev
-  ? "https://api-staging.alphablocks.ai/api/v1"
-  : "https://api-prod.alphablocks.ai/api/v1";
+const API_URL =
+  process.env.API_URL ??
+  (isDev ? "https://api-staging.alphablocks.ai/api/v1" : "https://api-prod.alphablocks.ai/api/v1");
 
 const config = {
   input: "src/index.ts",

@@ -68,6 +68,28 @@ export function setIframeAccessibleTitle(iframe: HTMLIFrameElement, assistantNam
   iframe.title = label ? `AlphaBlocks chat — ${label}` : "AlphaBlocks chat assistant";
 }
 
+function isLocalChatbotHost(): boolean {
+  try {
+    const host = new URL(CHATBOT_URL).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+/** Widget iframe URL; appends dev-only query params when SDK targets a local widget. */
+export function buildWidgetIframeSrc(token: string, version: number, theme: string): string {
+  const params = new URLSearchParams({
+    token,
+    version: String(version),
+    theme: theme || "",
+  });
+  if (isLocalChatbotHost()) {
+    params.set("widgetNudgeDev", "1");
+  }
+  return `${CHATBOT_URL}/?${params.toString()}`;
+}
+
 export function createIFrame(
   token: string,
   theme: string,
@@ -79,7 +101,7 @@ export function createIFrame(
   const assistantName = name || "";
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
-  iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(token)}&version=${version}&theme=${encodeURIComponent(theme || "")}`;
+  iframe.src = buildWidgetIframeSrc(token, version, theme);
   iframe.style.width = version === 1 ? width : "562px";
   iframe.style.height = version === 1 ? "60px" : "545px";
   iframe.style.border = "none";

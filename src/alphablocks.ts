@@ -1,8 +1,4 @@
-import {
-  ALPHABLOCKS_WRAPPER_ID,
-  CHATBOT_URL,
-  ASSISTANT_DETAILS_STORAGE_KEY,
-} from "./constants/index.ts";
+import { ALPHABLOCKS_WRAPPER_ID, ASSISTANT_DETAILS_STORAGE_KEY } from "./constants/index.ts";
 import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
 import { getAssistantDetails, getEndUser, getSessionDetails } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
@@ -20,6 +16,7 @@ import {
   handleSetCartAttributes,
 } from "./utils/event-handler.ts";
 import {
+  buildWidgetIframeSrc,
   createIFrame,
   hideIframe,
   sendOriginalWindowMessage,
@@ -32,6 +29,7 @@ import {
   onCartBridgeIframeMounted,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
+import { mountNudgeDevPanelIfLocal } from "./utils/nudge-dev-panel.ts";
 
 installShopifyCartFetchBridge();
 
@@ -49,6 +47,7 @@ export class AlphaBlocks {
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
+    mountNudgeDevPanelIfLocal(() => this.iframe);
     this.token = props.token;
     this.assistantName = props.name || "";
     this.assistantAvatar = props.avatar || "";
@@ -275,7 +274,7 @@ export class AlphaBlocks {
       return;
     }
 
-    iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(this.token)}&version=1&theme=${encodeURIComponent(this.assistantTheme || "")}`;
+    iframe.src = buildWidgetIframeSrc(this.token, 1, this.assistantTheme || "");
     setIframeAccessibleTitle(iframe, this.assistantName);
     iframe.style.display = "block";
     this.iframe = iframe;
