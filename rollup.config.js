@@ -4,7 +4,11 @@ import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
 const sdkUrl = process.env.SDK_URL ?? "";
-const isDev = sdkUrl.includes("localhost") || sdkUrl.includes("dev-widget");
+const isDev =
+  sdkUrl.includes("localhost") ||
+  sdkUrl.includes("127.0.0.1") ||
+  sdkUrl.includes("[::1]") ||
+  sdkUrl.includes("dev-widget");
 const outputDir = isDev ? "dist-dev" : "dist";
 
 const API_URL =

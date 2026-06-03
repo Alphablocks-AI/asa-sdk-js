@@ -7,6 +7,7 @@ import {
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
 import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
+import { resetHostScrollDepthReporter } from "./host-scroll-depth.ts";
 
 let mobileNudgeScrollCleanup: (() => void) | null = null;
 
@@ -236,4 +237,6 @@ export function sendParentUrlParams(
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);
+  // Post scroll after parent-url so the widget can reset state first, then apply a fresh sample.
+  resetHostScrollDepthReporter(() => iframe);
 }

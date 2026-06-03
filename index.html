@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asa Widget — local dev</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Asa — local nudge dev</title>
+    <base href="/" />
     <style>
       #alphablocks-local-dev-toolbar {
         position: fixed;
@@ -14,221 +15,64 @@
         flex-direction: column;
         gap: 8px;
         pointer-events: none;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-family: ui-sans-serif, system-ui, sans-serif;
         font-size: 12px;
-        line-height: 1.35;
       }
       #alphablocks-local-dev-toolbar > * {
         pointer-events: auto;
       }
-      .local-dev-chip-row {
+      #alphablocks-local-dev-chip-row {
         display: flex;
-        flex-direction: row;
         flex-wrap: wrap;
         gap: 8px;
         align-items: center;
       }
-      .local-dev-panels {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
       .local-dev-chip {
-        margin: 0;
-        box-sizing: border-box;
         border: 1px solid rgba(255, 255, 255, 0.25);
         border-radius: 9999px;
         padding: 6px 12px;
         background: rgba(23, 23, 23, 0.95);
         color: #fafafa;
-        font-family: inherit;
         font-size: 11px;
         font-weight: 600;
-        line-height: 1.35;
         cursor: pointer;
-        appearance: none;
-        -webkit-appearance: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        white-space: nowrap;
       }
-      .local-dev-panel {
-        display: none;
+      #alphablocks-local-dev-panels {
+        display: flex;
         flex-direction: column;
         gap: 8px;
-        width: min(calc(100vw - 24px), 360px);
-        padding: 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background: rgba(23, 23, 23, 0.97);
-        color: #fafafa;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-      }
-      .local-dev-panel.is-open {
-        display: flex;
-      }
-      .local-dev-panel-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-      }
-      .local-dev-panel-title {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: #d4d4d4;
-      }
-      .local-dev-panel-close {
-        border: none;
-        background: transparent;
-        color: #a3a3a3;
-        cursor: pointer;
-        font-size: 14px;
-        padding: 2px 6px;
-      }
-      .local-dev-panel-body {
-        font-size: 12px;
-        line-height: 1.5;
-        color: #e5e5e5;
-      }
-      .local-dev-panel-body p {
-        margin: 0;
-      }
-      .local-dev-panel-body ol {
-        margin: 0.5rem 0 0;
-        padding-left: 1.25rem;
-      }
-      .local-dev-panel-body li + li {
-        margin-top: 0.35rem;
-      }
-      .local-dev-panel-body code {
-        font-size: 11px;
-        background: #262626;
-        padding: 0.1em 0.35em;
-        border-radius: 4px;
-        color: #fafafa;
-      }
-      .local-dev-panel-body .safe {
-        margin-top: 0.75rem;
-        padding-top: 0.75rem;
-        border-top: 1px solid #404040;
-        font-size: 11px;
-        color: #a3a3a3;
       }
     </style>
-</head>
-<body>
-  <!--
-    =============================================================================
-    LOCAL-ONLY NUDGE DEV TESTING (this file is NOT used by production embeds)
-    =============================================================================
-
-    Merchants load embed.js / unpkg dist — not this index.html. Safe to keep in repo.
-
-    SETUP (every dev, first time or after pulling SDK nudge-dev changes)
-    -------------------------------------------------------------------
-    1. Asa-MonoRepo — start the widget dev server:
-         cd apps/widget && npm run dev
-       (runs on http://127.0.0.1:3002)
-
-    2. Optional widget env (query param below works without this):
-         cp apps/widget/.env.local.example apps/widget/.env.local
-         NEXT_PUBLIC_WIDGET_NUDGE_DEV=true
-
-    3. asa-sdk-js — build the NUDGE DEV bundle (required; do NOT use build or build:dev):
-         cd asa-sdk-js && npm run build:nudge-dev
-       Output: dist-dev/index.umd.js with CHATBOT_URL = http://127.0.0.1:3002 + NUDGE_DEV=true
-
-    4. Serve this folder (Live Server, etc.) e.g. http://127.0.0.1:5501/
-       Hard-refresh after rebuilding the SDK.
-
-    USING THE NUDGE DEV PANEL
-    -------------------------
-    - "Nudge dev" appears top-left of THIS page (host), not inside the widget iframe.
-    - Open it → pick scenario / plan tier → Apply. Dismiss clears the nudge.
-    - Widget iframe must be loaded (assistant visible) before Apply works.
-
-    WHEN TO REBUILD vs HOT RELOAD
-    -----------------------------
-    - Change apps/widget/dev/nudges/*  → save; Next.js hot-reloads (no SDK rebuild).
-    - Change asa-sdk-js/src/utils/nudge-dev-panel.ts → npm run build:nudge-dev + refresh.
-
-    WHY THIS NEVER SHOWS IN PROD (double-gated)
-    ---------------------------------------------
-    SDK host panel:
-      mountNudgeDevPanelIfLocal() runs only when NUDGE_DEV=true is baked at build time
-      (npm run build:nudge-dev). Hostname alone is not enough.
-      npm run build        → widget-asa.alphablocks.ai     → panel OFF
-      npm run build:dev    → dev-widget-asa.alphablocks.ai → panel OFF
-      npm run build:local  → 127.0.0.1:3002                → panel OFF (local widget, no nudge harness)
-      npm run build:nudge-dev → 127.0.0.1:3002 + NUDGE_DEV → panel ON (local nudge QA only)
-
-    Widget iframe:
-      isNudgeDevEnabled() returns false unless the widget page hostname is also
-      localhost | 127.0.0.1 | [::1]. Deployed widget URLs ignore dev postMessages
-      even if someone tampers with the parent page.
-
-    npm publish ships dist/ from `build`, not dist-dev/ from build:local.
-  -->
-
-  <div id="alphablocks-local-dev-toolbar" aria-label="Local development tools">
-    <div id="alphablocks-local-dev-chip-row" class="local-dev-chip-row">
-      <button type="button" id="local-dev-notes-chip" class="local-dev-chip">Dev Testing Instructions</button>
+    <script>
+      (function () {
+        var key = "alphablocks-scroll-qa-path";
+        var params = new URLSearchParams(location.search);
+        var fromQuery = params.get("scroll-qa-path");
+        var stored = sessionStorage.getItem(key);
+        var target =
+          fromQuery && fromQuery.charAt(0) === "/" ? fromQuery : stored;
+        if (!target || target === "/") return;
+        var path = location.pathname || "/";
+        if (path !== "/" && path !== "/index.html") return;
+        sessionStorage.removeItem(key);
+        history.replaceState(null, "", target);
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- Host mount for Nudges Dev Controls (SDK build:nudge-dev only). See apps/widget/dev/nudges/README.md -->
+    <div id="alphablocks-local-dev-toolbar" aria-label="Local nudge dev">
+      <div id="alphablocks-local-dev-chip-row" class="local-dev-chip-row"></div>
+      <div id="alphablocks-local-dev-panels"></div>
     </div>
-    <div id="alphablocks-local-dev-panels" class="local-dev-panels">
-      <div id="local-dev-notes-panel" class="local-dev-panel" role="dialog" aria-label="Local development instructions">
-        <div class="local-dev-panel-header">
-          <span class="local-dev-panel-title">Dev Testing Instructions</span>
-          <button type="button" id="local-dev-notes-close" class="local-dev-panel-close" aria-label="Close">✕</button>
-        </div>
-        <div class="local-dev-panel-body">
-          <p>This page is for internal QA only. Production stores use <code>embed.js</code>, not this file.</p>
-          <ol>
-            <li>Widget: <code>cd apps/widget && npm run dev</code> (port 3002)</li>
-            <li>SDK: <code>cd asa-sdk-js && npm run build:nudge-dev</code> — not <code>build</code>, <code>build:dev</code>, or <code>build:local</code></li>
-            <li>Open this file via Live Server (e.g. <code>:5501</code>) and hard-refresh</li>
-            <li>Click <strong>Nudges Dev Controls</strong> → scenario → <strong>Apply</strong></li>
-          </ol>
-          <p class="safe">
-            <strong>Prod-safe:</strong> the dev panel only mounts when the SDK bundle is built with
-            <code>npm run build:nudge-dev</code> (<code>NUDGE_DEV=true</code> + <code>127.0.0.1:3002</code>).
-            Published npm builds point at <code>widget-asa.alphablocks.ai</code> and never activate this UI.
-            The widget also rejects dev commands unless it is served from localhost.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <script>
-    (function () {
-      const chip = document.getElementById("local-dev-notes-chip");
-      const panel = document.getElementById("local-dev-notes-panel");
-      const closeBtn = document.getElementById("local-dev-notes-close");
-      if (!chip || !panel || !closeBtn) return;
-
-      const setOpen = (open) => {
-        chip.style.display = open ? "none" : "inline-flex";
-        panel.classList.toggle("is-open", open);
-      };
-
-      chip.addEventListener("click", () => setOpen(true));
-      closeBtn.addEventListener("click", () => setOpen(false));
-    })();
-  </script>
-
-  <!-- Start of Asa Widget Embed Code -->
-  <script src="dist-dev/index.umd.js"></script>
-  <script>
-    const alphablocksAssistant = new AlphaBlocks({
-      token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",
-    });
-    alphablocksAssistant.renderWrapper();
-    alphablocksAssistant.showAssistant();
-  </script>
-  <!-- End of Asa Widget Embed Code -->
-</body>
+    <script src="/dist-dev/index.umd.js"></script>
+    <script>
+      const alphablocksAssistant = new AlphaBlocks({
+        token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",
+      });
+      alphablocksAssistant.renderWrapper();
+      alphablocksAssistant.showAssistant();
+    </script>
+  </body>
 </html>

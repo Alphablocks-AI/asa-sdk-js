@@ -1,4 +1,8 @@
-import { ALPHABLOCKS_WRAPPER_ID, ASSISTANT_DETAILS_STORAGE_KEY } from "./constants/index.ts";
+import {
+  ALPHABLOCKS_WRAPPER_ID,
+  ASSISTANT_DETAILS_STORAGE_KEY,
+  NUDGE_DEV_ENABLED,
+} from "./constants/index.ts";
 import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
 import { getAssistantDetails, getEndUser, getSessionDetails } from "./utils/api.ts";
 import { getCookie, sendCookie, setCookie } from "./utils/cookie.ts";
@@ -25,11 +29,16 @@ import {
   setIframeSize,
 } from "./utils/iframe.ts";
 import {
+  installHostScrollDepthReporter,
+  resetHostScrollDepthReporter,
+} from "./utils/host-scroll-depth.ts";
+import {
   installShopifyCartFetchBridge,
   onCartBridgeIframeMounted,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
-import { mountNudgeDevPanelIfLocal } from "./utils/nudge-dev-panel.ts";
+import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
+import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
 
 installShopifyCartFetchBridge();
 
@@ -61,6 +70,25 @@ export class AlphaBlocks {
     window.addEventListener("message", (event) => {
       this.handleEvents(event.data.type, event.data.data);
     });
+    window.addEventListener("popstate", () => this.syncParentUrlToWidget());
+  }
+
+  /** Push host URL + reset scroll depth to the widget (SPA / scroll QA harness). */
+  public syncParentUrlToWidget(): void {
+    if (!this.iframe) return;
+    resetHostScrollDepthReporter(() => this.iframe);
+    sendParentUrlParams(this.iframe, this.assistantId);
+  }
+
+  private ensureNudgeScrollQaHarness(): void {
+    if (!NUDGE_DEV_ENABLED) return;
+    installNudgeScrollQa({
+      getAssistant: () => this,
+      getNudgeDevPanel: () => document.getElementById(NUDGE_DEV_PANEL_ID),
+    });
+    if (/^\/products\//.test(location.pathname)) {
+      this.syncParentUrlToWidget();
+    }
   }
 
   private handleEvents(type: string, data: EventDataType): void {
@@ -271,6 +299,8 @@ export class AlphaBlocks {
       element.appendChild(iframe);
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
+      installHostScrollDepthReporter(() => this.iframe);
+      this.ensureNudgeScrollQaHarness();
       return;
     }
 
@@ -279,6 +309,8 @@ export class AlphaBlocks {
     iframe.style.display = "block";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
+    installHostScrollDepthReporter(() => this.iframe);
+    this.ensureNudgeScrollQaHarness();
   }
 
   public async renderWrapper(): Promise<void> {
@@ -330,6 +362,9 @@ export class AlphaBlocks {
       onCartBridgeIframeMounted(iframe);
     }
 
+    installHostScrollDepthReporter(() => this.iframe);
+    this.ensureNudgeScrollQaHarness();
+
     if (this.assistantId && this.endUserId) {
       await getEndUser(this.assistantId, this.endUserId);
     }
@@ -340,6 +375,7 @@ export class AlphaBlocks {
     iframe.style.display = "none";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
+    installHostScrollDepthReporter(() => this.iframe);
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     element.style.zIndex = "2147480000";
     element.appendChild(iframe);

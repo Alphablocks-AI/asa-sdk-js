@@ -45,7 +45,8 @@ const FIXTURE_OPTIONS = [
   { id: "cart_removed_text", label: "Cart removed — text pill only" },
 ] as const;
 
-const PANEL_ID = "alphablocks-nudge-dev-panel";
+export const NUDGE_DEV_PANEL_ID = "alphablocks-nudge-dev-panel";
+const PANEL_ID = NUDGE_DEV_PANEL_ID;
 type NudgeDevFixtureId = (typeof FIXTURE_OPTIONS)[number]["id"];
 
 export function isLocalWidgetTarget(): boolean {
@@ -240,7 +241,7 @@ export function mountNudgeDevPanelIfLocal(getIframe: () => HTMLIFrameElement | n
       color: "#737373",
       lineHeight: "1.4",
     },
-    "Controls the widget iframe. Resize to ≤500px width for mobile, then Apply.",
+    "Fixture Apply = UI preview only. For dwell/scroll gates use Real triggers below.",
   );
   panel.appendChild(hint);
 
