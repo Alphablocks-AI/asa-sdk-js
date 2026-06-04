@@ -51,8 +51,10 @@ export class AlphaBlocks {
   private assistantColor: string = "";
   private assistantTextColor: string = "";
   private iframe: HTMLIFrameElement | null = null;
+  private hydratePromise: Promise<void> | null = null;
   public endUserId: string = "";
   public userId: string = "";
+  public isActive: boolean = true;
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
@@ -223,10 +225,16 @@ export class AlphaBlocks {
   private async hydrateAssistantDetails(storageKey: string): Promise<void> {
     const data = await getAssistantDetails(this.token);
     if (data && data.data?.assistant_details) {
+      const details = data.data.assistant_details;
+      this.isActive = details.is_active ?? true;
+      if (!this.isActive) {
+        sessionStorage.removeItem(storageKey);
+        return;
+      }
       this.assistantName = data.data.name;
       this.assistantId = data.data.id;
-      sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
-      updateWrapperProperties(data.data.assistant_details);
+      sessionStorage.setItem(storageKey, JSON.stringify(details));
+      updateWrapperProperties(details);
       if (this.iframe) {
         setIframeAccessibleTitle(this.iframe, this.assistantName);
       }
@@ -289,7 +297,9 @@ export class AlphaBlocks {
     }
   }
 
-  public showAssistant(): void {
+  public async showAssistant(): Promise<void> {
+    if (this.hydratePromise) await this.hydratePromise;
+    if (!this.isActive) return;
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     let iframe = element.querySelector("iframe");
 
@@ -313,7 +323,7 @@ export class AlphaBlocks {
     this.ensureNudgeScrollQaHarness();
   }
 
-  public async renderWrapper(): Promise<void> {
+  public renderWrapper(): void {
     createWrapper();
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
@@ -322,6 +332,15 @@ export class AlphaBlocks {
       try {
         const parsedAssistantDetails = JSON.parse(cachedAssistantDetails);
         if (parsedAssistantDetails) {
+          // If is_active is missing from cache (old cache), bust it and re-fetch.
+          if (!("is_active" in parsedAssistantDetails)) {
+            sessionStorage.removeItem(storageKey);
+            this.hydratePromise = this.hydrateAssistantDetails(storageKey);
+            return;
+          }
+          this.isActive = parsedAssistantDetails.is_active;
+          this.hydratePromise = Promise.resolve();
+          if (!this.isActive) return;
           this.assistantName = parsedAssistantDetails.name;
           this.assistantId = parsedAssistantDetails.id;
           updateWrapperProperties(parsedAssistantDetails);
@@ -334,11 +353,9 @@ export class AlphaBlocks {
         /* invalid JSON in sessionStorage */
       }
       sessionStorage.removeItem(storageKey);
-      void this.hydrateAssistantDetails(storageKey);
-      return;
     }
 
-    void this.hydrateAssistantDetails(storageKey);
+    this.hydratePromise = this.hydrateAssistantDetails(storageKey);
   }
 
   public addCustomCSS(props: CustomCSSProperties): void {
