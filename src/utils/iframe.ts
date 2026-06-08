@@ -233,7 +233,15 @@ export function sendParentUrlParams(
   window.history.replaceState({}, document.title, url.toString());
   const message = {
     type: "alphablocks-parent-url",
-    data: { ask_asa: askAsa, query, searchQuery, urlPath, params, sessionCookie },
+    data: {
+      ask_asa: askAsa,
+      query,
+      searchQuery,
+      urlPath,
+      params,
+      sessionCookie,
+      hostname: window.location.hostname,
+    },
   };
   if (!iframe || !iframe.contentWindow) return;
   iframe.contentWindow.postMessage(message, CHATBOT_URL);
