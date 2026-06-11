@@ -24,6 +24,7 @@ function applyFrameWrapperStyles(frameWrapper: HTMLElement): void {
   frameWrapper.style.display = "block";
   frameWrapper.style.width = "fit-content";
   frameWrapper.style.height = "fit-content";
+  frameWrapper.style.transition = "none";
   hideFrameWrapperUntilReady(frameWrapper);
 }
 

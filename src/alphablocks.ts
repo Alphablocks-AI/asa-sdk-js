@@ -12,6 +12,7 @@ import {
   getElement,
   getOrCreateFrameWrapper,
   hideFrameWrapperUntilReady,
+  revealFrameWrapper,
   syncFrameWrapperSize,
   updateWrapperProperties,
 } from "./utils/dom.ts";
@@ -135,6 +136,13 @@ export class AlphaBlocks {
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
+        try {
+          const container = getElement(ALPHABLOCKS_WRAPPER_ID);
+          const frameWrapper = getOrCreateFrameWrapper(container);
+          revealFrameWrapper(frameWrapper);
+        } catch {
+          // container not mounted yet
+        }
         break;
     }
   }

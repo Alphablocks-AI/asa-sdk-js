@@ -15,6 +15,7 @@ import {
   syncFrameWrapperSize,
 } from "./dom.ts";
 import { resetHostScrollDepthReporter } from "./host-scroll-depth.ts";
+import { getIframePostMessageTarget } from "./post-message-target.ts";
 
 let mobileNudgeScrollCleanup: (() => void) | null = null;
 
@@ -22,18 +23,6 @@ function teardownMobileNudgeScrollDismiss(): void {
   if (mobileNudgeScrollCleanup) {
     mobileNudgeScrollCleanup();
     mobileNudgeScrollCleanup = null;
-  }
-}
-
-/**
- * Mobile floating nudge (`mobileNudgeView`): shopper scrolls the host page, not the iframe.
- * postMessage targetOrigin uses the iframe’s loaded URL so local dev works even if SDK_URL differs at build time.
- */
-function getIframePostMessageTarget(iframe: HTMLIFrameElement): string {
-  try {
-    return new URL(iframe.src).origin;
-  } catch {
-    return "*";
   }
 }
 
@@ -62,7 +51,6 @@ function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFr
     teardownMobileNudgeScrollDismiss();
   };
 
-  // Capture: nested scroll containers (overflow regions) still notify during capture phase.
   window.addEventListener("scroll", onScroll, { passive: true, capture: true });
   document.addEventListener("scroll", onScroll, { passive: true, capture: true });
   mobileNudgeScrollCleanup = () => {
@@ -85,7 +73,6 @@ function isLocalChatbotHost(): boolean {
   }
 }
 
-/** Widget iframe URL; appends dev-only query params when SDK targets a local widget. */
 export function buildWidgetIframeSrc(token: string, version: number, theme: string): string {
   const params = new URLSearchParams({
     token,
@@ -105,7 +92,6 @@ export function createIFrame(
   version: number,
 ): HTMLIFrameElement {
   const iframe = document.createElement("iframe");
-  // Ensure name is a string and has a default value
   const assistantName = name || "";
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
@@ -115,34 +101,53 @@ export function createIFrame(
   iframe.style.border = "none";
   iframe.style.background = "transparent";
   iframe.style.display = "block";
+  iframe.style.transition = "none";
   iframe.allow = "microphone";
   setIframeAccessibleTitle(iframe, assistantName);
   return iframe;
 }
 
+const NUDGE_RESIZE_EVENTS = new Set(["productPageNudgeView", "mobileNudgeView", "nudgeView"]);
+
+function shouldRevealHostFrame(properties: EventDataType): boolean {
+  const event = properties.event ?? "";
+  const hasExplicitPxSize =
+    Boolean(properties.width?.endsWith("px")) && Boolean(properties.height?.endsWith("px"));
+  if (NUDGE_RESIZE_EVENTS.has(event) && hasExplicitPxSize) return true;
+  if (NUDGE_RESIZE_EVENTS.has(event)) return false;
+  return Boolean(properties.frameBorderRadius);
+}
+
 export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameElement | null): void {
   if (!iframe) return;
 
-  if (properties.frameBorderRadius) {
-    const containerDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
-    const frameWrapper = getOrCreateFrameWrapper(containerDiv);
-    frameWrapper.style.borderRadius = properties.frameBorderRadius;
-    // Widget autosize includes frameBorderRadius only after the surface has mounted.
-    revealFrameWrapper(frameWrapper);
-  }
-
-  if (!properties.height || !properties.width) return;
-
   const containerDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
   const frameWrapper = getOrCreateFrameWrapper(containerDiv);
+
+  if (properties.frameBorderRadius) {
+    frameWrapper.style.borderRadius = properties.frameBorderRadius;
+  }
+
+  if (!properties.height || !properties.width) {
+    if (shouldRevealHostFrame(properties)) {
+      revealFrameWrapper(frameWrapper);
+    }
+    return;
+  }
+
   iframe.style.width = properties.width;
 
-  containerDiv.style.width = "fit-content";
-  containerDiv.style.height = "fit-content";
-  frameWrapper.style.width = "fit-content";
-  frameWrapper.style.height = "fit-content";
+  const eventName = properties.event ?? "";
+  const hasExplicitPxSize = properties.width.endsWith("px") && properties.height.endsWith("px");
+  const skipFitContentReset = NUDGE_RESIZE_EVENTS.has(eventName) && hasExplicitPxSize;
 
-  // Get the current position to respect positioning set by updateWrapperProperties
+  if (!skipFitContentReset) {
+    containerDiv.style.width = "fit-content";
+    containerDiv.style.height = "fit-content";
+    frameWrapper.style.width = "fit-content";
+    frameWrapper.style.height = "fit-content";
+  }
+
   const currentPosition = getCurrentPosition();
   const custom = getCustomOffsets();
 
@@ -157,14 +162,12 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       iframe.style.width = "100%";
     }
   } else {
-    // Only remove left property if we're not in bottom-left or bottom-center position
     if (currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
       containerDiv.style.removeProperty("left");
     }
   }
 
   if (window.innerWidth <= 500) {
-    // For mobile, respect the current position but adjust spacing
     if (currentPosition === "bottom-left") {
       containerDiv.style.left = "16px";
       containerDiv.style.right = "";
@@ -178,7 +181,6 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       containerDiv.style.transform = "";
     }
     containerDiv.style.bottom = custom.bottom || "16px";
-    // If event provides explicit overrides, apply them (each independently)
     if (
       properties.right &&
       currentPosition !== "bottom-left" &&
@@ -189,7 +191,6 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     frameWrapper.style.width = properties.width;
     iframe.style.height = properties.height;
   } else {
-    // For desktop, respect the current position
     if (currentPosition === "bottom-left") {
       containerDiv.style.left = "24px";
       containerDiv.style.right = "";
@@ -204,7 +205,6 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       containerDiv.style.transform = "";
     }
     containerDiv.style.bottom = custom.bottom || "24px";
-    // Allow event to override custom/default individually
     if (
       properties.right &&
       currentPosition !== "bottom-left" &&
@@ -233,6 +233,11 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     frameWrapper.style.borderRadius = properties.frameBorderRadius;
   }
 
+  if (shouldRevealHostFrame(properties)) {
+    revealFrameWrapper(frameWrapper);
+    iframe.style.display = "block";
+  }
+
   syncMobileNudgeScrollDismiss(properties, iframe);
 }
 
@@ -242,7 +247,7 @@ export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): voi
     data: { width: window.innerWidth, height: window.innerHeight },
   };
   if (!iframe || !iframe.contentWindow) return;
-  iframe.contentWindow.postMessage(message, CHATBOT_URL);
+  iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
 }
 
 export function hideIframe(iframe: HTMLIFrameElement | null): void {
@@ -282,7 +287,6 @@ export function sendParentUrlParams(
     },
   };
   if (!iframe || !iframe.contentWindow) return;
-  iframe.contentWindow.postMessage(message, CHATBOT_URL);
-  // Post scroll after parent-url so the widget can reset state first, then apply a fresh sample.
+  iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
   resetHostScrollDepthReporter(() => iframe);
 }

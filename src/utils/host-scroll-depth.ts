@@ -1,4 +1,4 @@
-import { CHATBOT_URL } from "../constants/index.ts";
+import { getIframePostMessageTarget } from "./post-message-target.ts";
 
 export type HostScrollDepthPayload = {
   maxDepthPercent: number;
@@ -11,14 +11,6 @@ let maxDepthPercent = 0;
 let rafId = 0;
 let installed = false;
 let teardown: (() => void) | null = null;
-
-function getIframePostMessageTarget(iframe: HTMLIFrameElement): string {
-  try {
-    return new URL(iframe.src).origin;
-  } catch {
-    return CHATBOT_URL;
-  }
-}
 
 function readScrollMetrics(): HostScrollDepthPayload {
   const scrollRoot = document.scrollingElement ?? document.documentElement;
