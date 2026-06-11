@@ -6,7 +6,14 @@ import {
 } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
-import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
+import {
+  getCurrentPosition,
+  getCustomOffsets,
+  getElement,
+  getOrCreateFrameWrapper,
+  revealFrameWrapper,
+  syncFrameWrapperSize,
+} from "./dom.ts";
 import { resetHostScrollDepthReporter } from "./host-scroll-depth.ts";
 
 let mobileNudgeScrollCleanup: (() => void) | null = null;
@@ -103,96 +110,127 @@ export function createIFrame(
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
   iframe.src = buildWidgetIframeSrc(token, version, theme);
-  iframe.style.width = version === 1 ? width : "562px";
-  iframe.style.height = version === 1 ? "60px" : "545px";
+  iframe.style.width = version === 1 ? width : "560px";
+  iframe.style.height = version === 1 ? "60px" : "575px";
   iframe.style.border = "none";
   iframe.style.background = "transparent";
+  iframe.style.display = "block";
   iframe.allow = "microphone";
   setIframeAccessibleTitle(iframe, assistantName);
   return iframe;
 }
 
 export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameElement | null): void {
-  if (!iframe || !properties.height || !properties.width) return;
+  if (!iframe) return;
 
-  const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+  if (properties.frameBorderRadius) {
+    const containerDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+    const frameWrapper = getOrCreateFrameWrapper(containerDiv);
+    frameWrapper.style.borderRadius = properties.frameBorderRadius;
+    // Widget autosize includes frameBorderRadius only after the surface has mounted.
+    revealFrameWrapper(frameWrapper);
+  }
+
+  if (!properties.height || !properties.width) return;
+
+  const containerDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+  const frameWrapper = getOrCreateFrameWrapper(containerDiv);
   iframe.style.width = properties.width;
 
-  wrapperDiv.style.width = "fit-content";
-  wrapperDiv.style.height = "fit-content";
+  containerDiv.style.width = "fit-content";
+  containerDiv.style.height = "fit-content";
+  frameWrapper.style.width = "fit-content";
+  frameWrapper.style.height = "fit-content";
 
   // Get the current position to respect positioning set by updateWrapperProperties
   const currentPosition = getCurrentPosition();
   const custom = getCustomOffsets();
 
   if (properties.event === "mobileNudgeView") {
-    wrapperDiv.style.left = "16px";
-    iframe.style.width = "100%";
+    containerDiv.style.left = "16px";
+    const useMeasuredWidth = Boolean(properties.width?.endsWith("px"));
+    if (useMeasuredWidth) {
+      frameWrapper.style.width = properties.width!;
+      iframe.style.width = properties.width!;
+    } else {
+      frameWrapper.style.width = "100%";
+      iframe.style.width = "100%";
+    }
   } else {
     // Only remove left property if we're not in bottom-left or bottom-center position
     if (currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
-      wrapperDiv.style.removeProperty("left");
+      containerDiv.style.removeProperty("left");
     }
   }
 
   if (window.innerWidth <= 500) {
     // For mobile, respect the current position but adjust spacing
     if (currentPosition === "bottom-left") {
-      wrapperDiv.style.left = "16px";
-      wrapperDiv.style.right = "";
+      containerDiv.style.left = "16px";
+      containerDiv.style.right = "";
     } else if (currentPosition === "bottom-center") {
-      wrapperDiv.style.left = "50%";
-      wrapperDiv.style.transform = "translateX(-50%)";
-      wrapperDiv.style.right = "";
+      containerDiv.style.left = "50%";
+      containerDiv.style.transform = "translateX(-50%)";
+      containerDiv.style.right = "";
     } else {
-      wrapperDiv.style.right = custom.right || "16px";
-      wrapperDiv.style.left = "";
-      wrapperDiv.style.transform = "";
+      containerDiv.style.right = custom.right || "16px";
+      containerDiv.style.left = "";
+      containerDiv.style.transform = "";
     }
-    wrapperDiv.style.bottom = custom.bottom || "16px";
+    containerDiv.style.bottom = custom.bottom || "16px";
     // If event provides explicit overrides, apply them (each independently)
     if (
       properties.right &&
       currentPosition !== "bottom-left" &&
       currentPosition !== "bottom-center"
     )
-      wrapperDiv.style.right = properties.right;
-    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
-    wrapperDiv.style.width = properties.width;
+      containerDiv.style.right = properties.right;
+    if (properties.bottom) containerDiv.style.bottom = properties.bottom;
+    frameWrapper.style.width = properties.width;
     iframe.style.height = properties.height;
   } else {
     // For desktop, respect the current position
     if (currentPosition === "bottom-left") {
-      wrapperDiv.style.left = "24px";
-      wrapperDiv.style.right = "";
-      wrapperDiv.style.transform = "";
+      containerDiv.style.left = "24px";
+      containerDiv.style.right = "";
+      containerDiv.style.transform = "";
     } else if (currentPosition === "bottom-center") {
-      wrapperDiv.style.left = "50%";
-      wrapperDiv.style.transform = "translateX(-50%)";
-      wrapperDiv.style.right = "";
+      containerDiv.style.left = "50%";
+      containerDiv.style.transform = "translateX(-50%)";
+      containerDiv.style.right = "";
     } else {
-      wrapperDiv.style.right = custom.right || "24px";
-      wrapperDiv.style.left = "";
-      wrapperDiv.style.transform = "";
+      containerDiv.style.right = custom.right || "24px";
+      containerDiv.style.left = "";
+      containerDiv.style.transform = "";
     }
-    wrapperDiv.style.bottom = custom.bottom || "24px";
+    containerDiv.style.bottom = custom.bottom || "24px";
     // Allow event to override custom/default individually
     if (
       properties.right &&
       currentPosition !== "bottom-left" &&
       currentPosition !== "bottom-center"
     )
-      wrapperDiv.style.right = properties.right;
-    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
+      containerDiv.style.right = properties.right;
+    if (properties.bottom) containerDiv.style.bottom = properties.bottom;
     iframe.style.height = properties.height;
+    frameWrapper.style.width = properties.width;
+    frameWrapper.style.height = properties.height;
   }
 
   if (properties.right && properties.left && properties.bottom) {
-    wrapperDiv.style.right = properties.right;
-    wrapperDiv.style.bottom = properties.bottom;
-    wrapperDiv.style.left = properties.left;
-    wrapperDiv.style.width = "100%";
-    wrapperDiv.style.height = "100%";
+    containerDiv.style.right = properties.right;
+    containerDiv.style.bottom = properties.bottom;
+    containerDiv.style.left = properties.left;
+    containerDiv.style.width = "100%";
+    containerDiv.style.height = "100%";
+    frameWrapper.style.width = "100%";
+    frameWrapper.style.height = "100%";
+  } else if (properties.event !== "mobileNudgeView") {
+    syncFrameWrapperSize(frameWrapper, iframe);
+  }
+
+  if (properties.frameBorderRadius) {
+    frameWrapper.style.borderRadius = properties.frameBorderRadius;
   }
 
   syncMobileNudgeScrollDismiss(properties, iframe);

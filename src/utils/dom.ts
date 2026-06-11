@@ -1,4 +1,4 @@
-import { ALPHABLOCKS_WRAPPER_ID } from "../constants/index.ts";
+import { ALPHABLOCKS_FRAME_WRAPPER_CLASS, ALPHABLOCKS_WRAPPER_ID } from "../constants/index.ts";
 import { CustomCSSProperties } from "../types/index.ts";
 
 // Store the current position to prevent it from being overwritten by setIframeSize
@@ -14,6 +14,48 @@ export function getElement(container: string | HTMLElement): HTMLElement {
   return container;
 }
 
+const FRAME_WRAPPER_AWAITING_REVEAL_ATTR = "data-alphablocks-awaiting-reveal";
+
+function applyFrameWrapperStyles(frameWrapper: HTMLElement): void {
+  frameWrapper.style.boxShadow = "rgba(9, 14, 21, 0.16) 0px 5px 40px 0px";
+  // border-radius is set from widget theme via alphablocks-resize `frameBorderRadius`
+  frameWrapper.style.background = "transparent";
+  frameWrapper.style.overflow = "hidden";
+  frameWrapper.style.display = "block";
+  frameWrapper.style.width = "fit-content";
+  frameWrapper.style.height = "fit-content";
+  hideFrameWrapperUntilReady(frameWrapper);
+}
+
+/** Hide host chrome until the widget paints and posts theme-sized autosize (frameBorderRadius). */
+export function hideFrameWrapperUntilReady(frameWrapper: HTMLElement): void {
+  frameWrapper.style.visibility = "hidden";
+  frameWrapper.setAttribute(FRAME_WRAPPER_AWAITING_REVEAL_ATTR, "true");
+}
+
+export function revealFrameWrapper(frameWrapper: HTMLElement): void {
+  if (!frameWrapper.hasAttribute(FRAME_WRAPPER_AWAITING_REVEAL_ATTR)) return;
+  frameWrapper.removeAttribute(FRAME_WRAPPER_AWAITING_REVEAL_ATTR);
+  frameWrapper.style.visibility = "visible";
+}
+
+export function syncFrameWrapperSize(frameWrapper: HTMLElement, iframe: HTMLIFrameElement): void {
+  frameWrapper.style.width = iframe.style.width;
+  frameWrapper.style.height = iframe.style.height;
+}
+
+export function getOrCreateFrameWrapper(container?: HTMLElement): HTMLElement {
+  const containerEl = container ?? getElement(ALPHABLOCKS_WRAPPER_ID);
+  const existing = containerEl.querySelector(`.${ALPHABLOCKS_FRAME_WRAPPER_CLASS}`);
+  if (existing instanceof HTMLElement) return existing;
+
+  const frameWrapper = document.createElement("div");
+  frameWrapper.className = ALPHABLOCKS_FRAME_WRAPPER_CLASS;
+  applyFrameWrapperStyles(frameWrapper);
+  containerEl.appendChild(frameWrapper);
+  return frameWrapper;
+}
+
 export function createWrapper(): void {
   if (document.getElementById(ALPHABLOCKS_WRAPPER_ID)) return;
 
@@ -22,6 +64,9 @@ export function createWrapper(): void {
   wrapperDiv.style.position = "fixed";
   wrapperDiv.style.right = "24px";
   wrapperDiv.style.bottom = "24px";
+  wrapperDiv.style.zIndex = "2147480000";
+  wrapperDiv.style.width = "fit-content";
+  wrapperDiv.style.height = "fit-content";
   document.body.appendChild(wrapperDiv);
 }
 

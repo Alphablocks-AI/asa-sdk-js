@@ -1,13 +1,13 @@
 /**
  * @jest-environment jsdom
  */
-import { waitFor, fireEvent } from "@testing-library/dom";
+import { waitFor } from "@testing-library/dom";
 import { AlphaBlocks } from "../alphablocks.ts";
 import "@testing-library/jest-dom";
 
 describe("AlphaBlocks", () => {
   let alphaBlocks: AlphaBlocks;
-  let originalContentWindow: any;
+  let originalContentWindow: PropertyDescriptor | undefined;
 
   const defaultProps = {
     token: "test-token",
@@ -27,7 +27,7 @@ describe("AlphaBlocks", () => {
       "contentWindow",
     );
 
-    global.fetch = jest.fn(() =>
+    globalThis.fetch = jest.fn(() =>
       Promise.resolve({
         json: () => Promise.resolve({ data: { name: "Test Assistant", id: 1 } }),
       }),
@@ -117,23 +117,37 @@ describe("AlphaBlocks", () => {
       expect(wrapper?.style.position).toBe("fixed");
       expect(wrapper?.style.right).toBe("24px");
       expect(wrapper?.style.bottom).toBe("24px");
-      expect(global.fetch).toHaveBeenCalled();
+      expect(wrapper?.style.zIndex).toBe("2147480000");
+      expect(wrapper?.style.boxShadow).toBe("");
+      expect(wrapper?.style.borderRadius).toBe("");
+      expect(wrapper?.querySelector(".alphablocks-frame-wrapper")).toBeNull();
+      expect(globalThis.fetch).toHaveBeenCalled();
     });
   });
 
   describe("preRenderAssistant", () => {
-    test("should create hidden iframe", () => {
+    test("should create hidden iframe inside frame wrapper", () => {
       document.body.innerHTML = '<div id="alphablocks-assistant-container"></div>';
       alphaBlocks.preRenderAssistant();
-      const iframe = document.querySelector("iframe");
+      const container = document.getElementById("alphablocks-assistant-container");
+      const frameWrapper = container?.querySelector(
+        ".alphablocks-frame-wrapper",
+      ) as HTMLElement | null;
+      const iframe = frameWrapper?.querySelector("iframe");
+      expect(frameWrapper).toBeInTheDocument();
       expect(iframe).toBeInTheDocument();
       expect(iframe?.style.display).toBe("none");
+      expect(frameWrapper?.style.boxShadow).toBe("rgba(9, 14, 21, 0.16) 0px 5px 40px 0px");
+      expect(frameWrapper?.style.borderRadius).toBe("");
+      expect(frameWrapper?.style.background).toBe("transparent");
+      expect(frameWrapper?.style.overflow).toBe("hidden");
+      expect(frameWrapper?.style.visibility).toBe("hidden");
+      expect(iframe?.style.boxShadow).toBe("");
+      expect(iframe?.style.borderRadius).toBe("");
     });
   });
 
   describe("Event Handling", () => {
-    let postMessageSpy: jest.SpyInstance;
-
     beforeEach(() => {
       document.body.innerHTML = `
         <div id="container"></div>
@@ -150,22 +164,25 @@ describe("AlphaBlocks", () => {
           },
           writable: true,
         });
-        postMessageSpy = jest.spyOn(iframe.contentWindow!, "postMessage");
       }
     });
 
     test("should handle resize event", async () => {
       const iframe = document.querySelector("iframe");
+      const frameWrapper = document.querySelector(
+        ".alphablocks-frame-wrapper",
+      ) as HTMLElement | null;
       window.postMessage(
         {
           type: "alphablocks-resize",
-          data: { width: "600px", height: "400px" },
+          data: { width: "600px", height: "400px", frameBorderRadius: "24px" },
         },
         "*",
       );
       await waitFor(() => {
         expect(iframe?.style.width).toBe("600px");
         expect(iframe?.style.height).toBe("400px");
+        expect(frameWrapper?.style.visibility).toBe("visible");
       });
     });
 

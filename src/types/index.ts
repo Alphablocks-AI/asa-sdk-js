@@ -37,6 +37,7 @@ export interface EventDataType {
   variantId?: number;
   quantity?: number;
   event?: string;
+  frameBorderRadius?: string;
   query?: string;
   searchQuery?: string;
   hasProducts?: boolean;

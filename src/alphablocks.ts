@@ -10,6 +10,9 @@ import {
   createWrapper,
   getChatIconHTML,
   getElement,
+  getOrCreateFrameWrapper,
+  hideFrameWrapperUntilReady,
+  syncFrameWrapperSize,
   updateWrapperProperties,
 } from "./utils/dom.ts";
 import { setCustomOffsets } from "./utils/dom.ts";
@@ -306,7 +309,9 @@ export class AlphaBlocks {
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 1);
       element.style.zIndex = "2147480000";
-      element.appendChild(iframe);
+      const frameWrapper = getOrCreateFrameWrapper(element);
+      frameWrapper.appendChild(iframe);
+      syncFrameWrapperSize(frameWrapper, iframe);
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
       installHostScrollDepthReporter(() => this.iframe);
@@ -316,6 +321,7 @@ export class AlphaBlocks {
 
     iframe.src = buildWidgetIframeSrc(this.token, 1, this.assistantTheme || "");
     setIframeAccessibleTitle(iframe, this.assistantName);
+    hideFrameWrapperUntilReady(getOrCreateFrameWrapper(element));
     iframe.style.display = "block";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
@@ -369,7 +375,9 @@ export class AlphaBlocks {
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
       element.style.zIndex = "2147480000";
-      element.appendChild(iframe);
+      const frameWrapper = getOrCreateFrameWrapper(element);
+      frameWrapper.appendChild(iframe);
+      syncFrameWrapperSize(frameWrapper, iframe);
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
     } else {
@@ -395,6 +403,8 @@ export class AlphaBlocks {
     installHostScrollDepthReporter(() => this.iframe);
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     element.style.zIndex = "2147480000";
-    element.appendChild(iframe);
+    const frameWrapper = getOrCreateFrameWrapper(element);
+    frameWrapper.appendChild(iframe);
+    syncFrameWrapperSize(frameWrapper, iframe);
   }
 }
