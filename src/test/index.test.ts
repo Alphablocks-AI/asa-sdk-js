@@ -186,6 +186,32 @@ describe("AlphaBlocks", () => {
       });
     });
 
+    test("should expand iframe for mobileView chat sheet", async () => {
+      const iframe = document.querySelector("iframe");
+      const frameWrapper = document.querySelector(
+        ".alphablocks-frame-wrapper",
+      ) as HTMLElement | null;
+      window.postMessage(
+        {
+          type: "alphablocks-resize",
+          data: {
+            event: "mobileView",
+            width: "100%",
+            height: "100dvh",
+            right: "0px",
+            bottom: "0px",
+            left: "0px",
+          },
+        },
+        "*",
+      );
+      await waitFor(() => {
+        expect(iframe?.style.width).toBe("100%");
+        expect(["100dvh", "100vh"]).toContain(iframe?.style.height);
+        expect(frameWrapper?.style.visibility).toBe("visible");
+      });
+    });
+
     test("should remove host shadow for nudge resize events", async () => {
       const iframe = document.querySelector("iframe");
       const frameWrapper = document.querySelector(

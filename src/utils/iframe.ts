@@ -111,12 +111,42 @@ export function createIFrame(
 
 const NUDGE_RESIZE_EVENTS = new Set(["productPageNudgeView", "mobileNudgeView", "nudgeView"]);
 
+function isFullBleedMobileLayout(properties: EventDataType): boolean {
+  return Boolean(properties.right) && Boolean(properties.left) && Boolean(properties.bottom);
+}
+
+/** Apply a CSS size; fall back to `vh` when `dvh` is rejected (older engines / jsdom). */
+function setElementStyleDimension(
+  el: HTMLElement,
+  dimension: "width" | "height",
+  value: string,
+): void {
+  el.style.setProperty(dimension, value);
+  const applied = el.style.getPropertyValue(dimension);
+  if (applied === value) return;
+
+  if (value.endsWith("dvh")) {
+    const vhFallback = value.replace(/dvh$/, "vh");
+    if (applied !== vhFallback) {
+      el.style.setProperty(dimension, vhFallback);
+    }
+    return;
+  }
+  if (value.endsWith("dvw")) {
+    const vwFallback = value.replace(/dvw$/, "vw");
+    if (applied !== vwFallback) {
+      el.style.setProperty(dimension, vwFallback);
+    }
+  }
+}
+
 function shouldRevealHostFrame(properties: EventDataType): boolean {
   const event = properties.event ?? "";
   const hasExplicitPxSize =
     Boolean(properties.width?.endsWith("px")) && Boolean(properties.height?.endsWith("px"));
   if (NUDGE_RESIZE_EVENTS.has(event) && hasExplicitPxSize) return true;
   if (NUDGE_RESIZE_EVENTS.has(event)) return false;
+  if (event === "mobileView" || isFullBleedMobileLayout(properties)) return true;
   return Boolean(properties.frameBorderRadius);
 }
 
@@ -137,7 +167,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     return;
   }
 
-  iframe.style.width = properties.width;
+  setElementStyleDimension(iframe, "width", properties.width);
 
   const eventName = properties.event ?? "";
   const hasExplicitPxSize = properties.width.endsWith("px") && properties.height.endsWith("px");
@@ -153,18 +183,19 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   const currentPosition = getCurrentPosition();
   const isMobileViewport = window.innerWidth <= 500;
   const isNudgeFrame = NUDGE_RESIZE_EVENTS.has(eventName);
-  const isFullBleedMobile =
-    Boolean(properties.right) && Boolean(properties.left) && Boolean(properties.bottom);
+  const isFullBleedMobile = isFullBleedMobileLayout(properties);
 
   if (isFullBleedMobile) {
     containerDiv.style.bottom = properties.bottom!;
     containerDiv.style.left = properties.left!;
     containerDiv.style.right = properties.right!;
-    containerDiv.style.top = "";
+    containerDiv.style.top = "0";
     containerDiv.style.transform = "";
     containerDiv.style.margin = "";
     containerDiv.style.width = "100%";
     containerDiv.style.height = "100%";
+    setElementStyleDimension(iframe, "width", properties.width);
+    setElementStyleDimension(iframe, "height", properties.height);
     frameWrapper.style.width = "100%";
     frameWrapper.style.height = "100%";
   } else if (isNudgeFrame) {
@@ -184,7 +215,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     } else {
       applyContainerCornerPosition(containerDiv, currentPosition);
     }
-    iframe.style.height = properties.height;
+    setElementStyleDimension(iframe, "height", properties.height);
     frameWrapper.style.width = properties.width;
     frameWrapper.style.height = properties.height;
     syncFrameWrapperSize(frameWrapper, iframe);
@@ -194,7 +225,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       bottom: properties.marginBottom ?? properties.bottom,
       right: properties.marginRight ?? properties.right,
     });
-    iframe.style.height = properties.height;
+    setElementStyleDimension(iframe, "height", properties.height);
     frameWrapper.style.width = properties.width;
     frameWrapper.style.height = properties.height;
     syncFrameWrapperSize(frameWrapper, iframe);
