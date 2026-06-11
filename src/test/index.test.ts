@@ -186,6 +186,31 @@ describe("AlphaBlocks", () => {
       });
     });
 
+    test("should remove host shadow for nudge resize events", async () => {
+      const iframe = document.querySelector("iframe");
+      const frameWrapper = document.querySelector(
+        ".alphablocks-frame-wrapper",
+      ) as HTMLElement | null;
+      window.postMessage(
+        {
+          type: "alphablocks-resize",
+          data: {
+            event: "productPageNudgeView",
+            width: "342px",
+            height: "240px",
+            frameBorderRadius: "0.75rem",
+          },
+        },
+        "*",
+      );
+      await waitFor(() => {
+        expect(frameWrapper?.style.boxShadow).toBe("none");
+        expect(frameWrapper?.style.background).toBe("transparent");
+        expect(frameWrapper?.style.overflow).toBe("visible");
+        expect(iframe?.style.background).toBe("transparent");
+      });
+    });
+
     test("should handle hide iframe event", async () => {
       const iframe = document.querySelector("iframe");
       const chatIcon = document.getElementById("alphablocks-chat-icon-container");

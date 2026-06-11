@@ -16,8 +16,77 @@ export function getElement(container: string | HTMLElement): HTMLElement {
 
 const FRAME_WRAPPER_AWAITING_REVEAL_ATTR = "data-alphablocks-awaiting-reveal";
 
+export const FRAME_WRAPPER_DEFAULT_BOX_SHADOW = "rgba(9, 14, 21, 0.16) 0px 5px 40px 0px";
+
+export const WRAPPER_EDGE_OFFSET_DESKTOP = "24px";
+export const WRAPPER_EDGE_OFFSET_MOBILE = "16px";
+
+export type ContainerOffsetPositionOpts = {
+  isMobile?: boolean;
+  bottom?: string;
+  right?: string;
+  left?: string;
+};
+
+/** Flush to viewport corner — nudges; page offset lives inside the iframe padding. */
+export function applyContainerCornerPosition(container: HTMLElement, position: string): void {
+  container.style.top = "";
+  container.style.bottom = "0";
+  container.style.margin = "";
+
+  switch (position) {
+    case "bottom-left":
+      container.style.left = "0";
+      container.style.right = "";
+      container.style.transform = "";
+      break;
+    case "bottom-center":
+      container.style.left = "50%";
+      container.style.right = "";
+      container.style.transform = "translateX(-50%)";
+      break;
+    default:
+      container.style.right = "0";
+      container.style.left = "";
+      container.style.transform = "";
+      break;
+  }
+}
+
+/** Fixed corner placement with right/bottom/left offsets (pill + chat). */
+export function applyContainerOffsetPosition(
+  container: HTMLElement,
+  position: string,
+  opts: ContainerOffsetPositionOpts = {},
+): void {
+  const defaultOffset = opts.isMobile ? WRAPPER_EDGE_OFFSET_MOBILE : WRAPPER_EDGE_OFFSET_DESKTOP;
+  const custom = getCustomOffsets();
+
+  container.style.top = "";
+  container.style.margin = "";
+  container.style.bottom = opts.bottom ?? custom.bottom ?? defaultOffset;
+
+  switch (position) {
+    case "bottom-left":
+      container.style.left = opts.left ?? custom.left ?? defaultOffset;
+      container.style.right = "";
+      container.style.transform = "";
+      break;
+    case "bottom-center":
+      container.style.left = "50%";
+      container.style.right = "";
+      container.style.transform = "translateX(-50%)";
+      break;
+    default:
+      container.style.right = opts.right ?? custom.right ?? defaultOffset;
+      container.style.left = "";
+      container.style.transform = "";
+      break;
+  }
+}
+
 function applyFrameWrapperStyles(frameWrapper: HTMLElement): void {
-  frameWrapper.style.boxShadow = "rgba(9, 14, 21, 0.16) 0px 5px 40px 0px";
+  frameWrapper.style.boxShadow = FRAME_WRAPPER_DEFAULT_BOX_SHADOW;
   // border-radius is set from widget theme via alphablocks-resize `frameBorderRadius`
   frameWrapper.style.background = "transparent";
   frameWrapper.style.overflow = "hidden";
@@ -45,6 +114,28 @@ export function syncFrameWrapperSize(frameWrapper: HTMLElement, iframe: HTMLIFra
   frameWrapper.style.height = iframe.style.height;
 }
 
+/** Nudges render their own shadows inside the iframe — host chrome stays transparent. */
+export function applyFrameWrapperChrome(
+  frameWrapper: HTMLElement,
+  iframe: HTMLIFrameElement,
+  containerDiv: HTMLElement,
+  opts: { isNudge: boolean },
+): void {
+  iframe.style.background = "transparent";
+  containerDiv.style.background = "transparent";
+
+  if (opts.isNudge) {
+    frameWrapper.style.boxShadow = "none";
+    frameWrapper.style.background = "transparent";
+    frameWrapper.style.overflow = "visible";
+    return;
+  }
+
+  frameWrapper.style.boxShadow = FRAME_WRAPPER_DEFAULT_BOX_SHADOW;
+  frameWrapper.style.background = "transparent";
+  frameWrapper.style.overflow = "hidden";
+}
+
 export function getOrCreateFrameWrapper(container?: HTMLElement): HTMLElement {
   const containerEl = container ?? getElement(ALPHABLOCKS_WRAPPER_ID);
   const existing = containerEl.querySelector(`.${ALPHABLOCKS_FRAME_WRAPPER_CLASS}`);
@@ -63,9 +154,8 @@ export function createWrapper(): void {
   const wrapperDiv = document.createElement("div");
   wrapperDiv.setAttribute("id", ALPHABLOCKS_WRAPPER_ID);
   wrapperDiv.style.position = "fixed";
-  wrapperDiv.style.right = "24px";
-  wrapperDiv.style.bottom = "24px";
   wrapperDiv.style.zIndex = "2147480000";
+  applyContainerOffsetPosition(wrapperDiv, currentPosition);
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";
   document.body.appendChild(wrapperDiv);
@@ -73,25 +163,8 @@ export function createWrapper(): void {
 
 export function updateWrapperProperties(properties: { position: string }): void {
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
-  wrapperDiv.style.left = "";
-  wrapperDiv.style.right = "";
-  wrapperDiv.style.transform = "";
-
-  // Store the current position
   currentPosition = properties.position;
-
-  switch (properties.position) {
-    case "bottom-left":
-      wrapperDiv.style.left = "24px";
-      break;
-    case "bottom-center":
-      wrapperDiv.style.left = "50%";
-      wrapperDiv.style.transform = "translateX(-50%)";
-      break;
-    default:
-      wrapperDiv.style.right = "24px";
-      break;
-  }
+  applyContainerOffsetPosition(wrapperDiv, properties.position);
 }
 
 // Export function to get current position
@@ -117,12 +190,11 @@ export function getChatIconHTML(
 export function setCustomOffsets(offsets: CustomCSSProperties): void {
   customOffsets = { ...customOffsets, ...offsets };
   const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
-  if (offsets.bottom) {
-    wrapperDiv.style.bottom = offsets.bottom;
-  }
-  if (offsets.right && currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
-    wrapperDiv.style.right = offsets.right;
-  }
+  applyContainerOffsetPosition(wrapperDiv, currentPosition, {
+    bottom: offsets.bottom,
+    right: offsets.right,
+    left: offsets.left,
+  });
 }
 
 export function getCustomOffsets(): CustomCSSProperties {

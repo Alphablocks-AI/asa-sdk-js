@@ -7,8 +7,10 @@ import {
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
 import {
+  applyContainerCornerPosition,
+  applyContainerOffsetPosition,
+  applyFrameWrapperChrome,
   getCurrentPosition,
-  getCustomOffsets,
   getElement,
   getOrCreateFrameWrapper,
   revealFrameWrapper,
@@ -149,89 +151,62 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   }
 
   const currentPosition = getCurrentPosition();
-  const custom = getCustomOffsets();
+  const isMobileViewport = window.innerWidth <= 500;
+  const isNudgeFrame = NUDGE_RESIZE_EVENTS.has(eventName);
+  const isFullBleedMobile =
+    Boolean(properties.right) && Boolean(properties.left) && Boolean(properties.bottom);
 
-  if (properties.event === "mobileNudgeView") {
-    containerDiv.style.left = "16px";
-    const useMeasuredWidth = Boolean(properties.width?.endsWith("px"));
-    if (useMeasuredWidth) {
-      frameWrapper.style.width = properties.width!;
-      iframe.style.width = properties.width!;
-    } else {
-      frameWrapper.style.width = "100%";
-      iframe.style.width = "100%";
-    }
-  } else {
-    if (currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
-      containerDiv.style.removeProperty("left");
-    }
-  }
-
-  if (window.innerWidth <= 500) {
-    if (currentPosition === "bottom-left") {
-      containerDiv.style.left = "16px";
-      containerDiv.style.right = "";
-    } else if (currentPosition === "bottom-center") {
-      containerDiv.style.left = "50%";
-      containerDiv.style.transform = "translateX(-50%)";
-      containerDiv.style.right = "";
-    } else {
-      containerDiv.style.right = custom.right || "16px";
-      containerDiv.style.left = "";
-      containerDiv.style.transform = "";
-    }
-    containerDiv.style.bottom = custom.bottom || "16px";
-    if (
-      properties.right &&
-      currentPosition !== "bottom-left" &&
-      currentPosition !== "bottom-center"
-    )
-      containerDiv.style.right = properties.right;
-    if (properties.bottom) containerDiv.style.bottom = properties.bottom;
-    frameWrapper.style.width = properties.width;
-    iframe.style.height = properties.height;
-  } else {
-    if (currentPosition === "bottom-left") {
-      containerDiv.style.left = "24px";
-      containerDiv.style.right = "";
-      containerDiv.style.transform = "";
-    } else if (currentPosition === "bottom-center") {
-      containerDiv.style.left = "50%";
-      containerDiv.style.transform = "translateX(-50%)";
-      containerDiv.style.right = "";
-    } else {
-      containerDiv.style.right = custom.right || "24px";
-      containerDiv.style.left = "";
-      containerDiv.style.transform = "";
-    }
-    containerDiv.style.bottom = custom.bottom || "24px";
-    if (
-      properties.right &&
-      currentPosition !== "bottom-left" &&
-      currentPosition !== "bottom-center"
-    )
-      containerDiv.style.right = properties.right;
-    if (properties.bottom) containerDiv.style.bottom = properties.bottom;
-    iframe.style.height = properties.height;
-    frameWrapper.style.width = properties.width;
-    frameWrapper.style.height = properties.height;
-  }
-
-  if (properties.right && properties.left && properties.bottom) {
-    containerDiv.style.right = properties.right;
-    containerDiv.style.bottom = properties.bottom;
-    containerDiv.style.left = properties.left;
+  if (isFullBleedMobile) {
+    containerDiv.style.bottom = properties.bottom!;
+    containerDiv.style.left = properties.left!;
+    containerDiv.style.right = properties.right!;
+    containerDiv.style.top = "";
+    containerDiv.style.transform = "";
+    containerDiv.style.margin = "";
     containerDiv.style.width = "100%";
     containerDiv.style.height = "100%";
     frameWrapper.style.width = "100%";
     frameWrapper.style.height = "100%";
-  } else if (properties.event !== "mobileNudgeView") {
+  } else if (isNudgeFrame) {
+    if (properties.event === "mobileNudgeView") {
+      containerDiv.style.left = "0";
+      containerDiv.style.right = "0";
+      containerDiv.style.bottom = "0";
+      containerDiv.style.transform = "";
+      const useMeasuredWidth = Boolean(properties.width?.endsWith("px"));
+      if (useMeasuredWidth) {
+        frameWrapper.style.width = properties.width!;
+        iframe.style.width = properties.width!;
+      } else {
+        frameWrapper.style.width = "100%";
+        iframe.style.width = "100%";
+      }
+    } else {
+      applyContainerCornerPosition(containerDiv, currentPosition);
+    }
+    iframe.style.height = properties.height;
+    frameWrapper.style.width = properties.width;
+    frameWrapper.style.height = properties.height;
+    syncFrameWrapperSize(frameWrapper, iframe);
+  } else {
+    applyContainerOffsetPosition(containerDiv, currentPosition, {
+      isMobile: isMobileViewport,
+      bottom: properties.marginBottom ?? properties.bottom,
+      right: properties.marginRight ?? properties.right,
+    });
+    iframe.style.height = properties.height;
+    frameWrapper.style.width = properties.width;
+    frameWrapper.style.height = properties.height;
     syncFrameWrapperSize(frameWrapper, iframe);
   }
 
   if (properties.frameBorderRadius) {
     frameWrapper.style.borderRadius = properties.frameBorderRadius;
   }
+
+  applyFrameWrapperChrome(frameWrapper, iframe, containerDiv, {
+    isNudge: isNudgeFrame,
+  });
 
   if (shouldRevealHostFrame(properties)) {
     revealFrameWrapper(frameWrapper);

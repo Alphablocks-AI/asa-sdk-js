@@ -38,6 +38,8 @@ export interface EventDataType {
   quantity?: number;
   event?: string;
   frameBorderRadius?: string;
+  marginBottom?: string;
+  marginRight?: string;
   query?: string;
   searchQuery?: string;
   hasProducts?: boolean;
@@ -49,4 +51,5 @@ export interface EventDataType {
 export interface CustomCSSProperties {
   bottom?: string;
   right?: string;
+  left?: string;
 }
