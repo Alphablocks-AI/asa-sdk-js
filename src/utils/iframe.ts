@@ -171,7 +171,9 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
 
   const eventName = properties.event ?? "";
   const hasExplicitPxSize = properties.width.endsWith("px") && properties.height.endsWith("px");
-  const skipFitContentReset = NUDGE_RESIZE_EVENTS.has(eventName) && hasExplicitPxSize;
+  const isMobileNudgeEvent = eventName === "mobileNudgeView";
+  const skipFitContentReset =
+    NUDGE_RESIZE_EVENTS.has(eventName) && (hasExplicitPxSize || isMobileNudgeEvent);
 
   if (!skipFitContentReset) {
     containerDiv.style.width = "fit-content";
@@ -199,26 +201,26 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     frameWrapper.style.width = "100%";
     frameWrapper.style.height = "100%";
   } else if (isNudgeFrame) {
-    if (properties.event === "mobileNudgeView") {
+    if (isMobileNudgeEvent) {
       containerDiv.style.left = "0";
       containerDiv.style.right = "0";
       containerDiv.style.bottom = "0";
+      containerDiv.style.top = "";
       containerDiv.style.transform = "";
-      const useMeasuredWidth = Boolean(properties.width?.endsWith("px"));
-      if (useMeasuredWidth) {
-        frameWrapper.style.width = properties.width!;
-        iframe.style.width = properties.width!;
-      } else {
-        frameWrapper.style.width = "100%";
-        iframe.style.width = "100%";
-      }
+      containerDiv.style.margin = "";
+      containerDiv.style.width = "100%";
+      containerDiv.style.height = properties.height;
+      frameWrapper.style.width = "100%";
+      frameWrapper.style.height = properties.height;
+      setElementStyleDimension(iframe, "width", "100%");
+      setElementStyleDimension(iframe, "height", properties.height);
     } else {
       applyContainerCornerPosition(containerDiv, currentPosition);
+      setElementStyleDimension(iframe, "height", properties.height);
+      frameWrapper.style.width = properties.width;
+      frameWrapper.style.height = properties.height;
+      syncFrameWrapperSize(frameWrapper, iframe);
     }
-    setElementStyleDimension(iframe, "height", properties.height);
-    frameWrapper.style.width = properties.width;
-    frameWrapper.style.height = properties.height;
-    syncFrameWrapperSize(frameWrapper, iframe);
   } else {
     applyContainerOffsetPosition(containerDiv, currentPosition, {
       isMobile: isMobileViewport,
