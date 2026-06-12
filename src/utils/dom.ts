@@ -18,7 +18,21 @@ const FRAME_WRAPPER_AWAITING_REVEAL_ATTR = "data-alphablocks-awaiting-reveal";
 
 export const FRAME_WRAPPER_DEFAULT_BOX_SHADOW = "rgba(9, 14, 21, 0.16) 0px 5px 40px 0px";
 
+/**
+ * Desktop host wrapper corner offset.
+ *
+ * **Monorepo sync:** keep in sync with `WIDGET_EMBED_LAYOUT.hostEdgeInsetDesktopPx` in
+ * `Asa-MonoRepo/packages/widget-theme/src/embed-layout.ts` and `CHAT_IFRAME_EDGE_MARGIN_PX`
+ * in `src/constants/index.ts`.
+ */
 export const WRAPPER_EDGE_OFFSET_DESKTOP = "24px";
+
+/**
+ * Mobile host wrapper corner offset.
+ *
+ * **Monorepo sync:** keep in sync with `WIDGET_EMBED_LAYOUT.hostEdgeInsetMobilePx` in
+ * `Asa-MonoRepo/packages/widget-theme/src/embed-layout.ts`.
+ */
 export const WRAPPER_EDGE_OFFSET_MOBILE = "16px";
 
 export type ContainerOffsetPositionOpts = {

@@ -2,6 +2,7 @@ import {
   ALPHABLOCKS_WRAPPER_ID,
   CHATBOT_URL,
   CHAT_IFRAME_VIEWPORT_HEIGHT,
+  CHAT_IFRAME_WIDTH_PX,
   EMBED_MOBILE_MAX_INNER_WIDTH_PX,
   MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX,
 } from "../constants/index.ts";
@@ -99,7 +100,7 @@ export function createIFrame(
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
   iframe.src = buildWidgetIframeSrc(token, version, theme);
-  iframe.style.width = version === 1 ? width : "480px";
+  iframe.style.width = version === 1 ? width : `${CHAT_IFRAME_WIDTH_PX}px`;
   iframe.style.height = version === 1 ? "60px" : CHAT_IFRAME_VIEWPORT_HEIGHT;
   iframe.style.border = "none";
   iframe.style.background = "transparent";
@@ -184,7 +185,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   }
 
   const currentPosition = getCurrentPosition();
-  const isMobileViewport = window.innerWidth <= 500;
+  const isMobileViewport = window.innerWidth <= EMBED_MOBILE_MAX_INNER_WIDTH_PX;
   const isNudgeFrame = NUDGE_RESIZE_EVENTS.has(eventName);
   const isFullBleedMobile = isFullBleedMobileLayout(properties);
 
@@ -223,9 +224,10 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
       syncFrameWrapperSize(frameWrapper, iframe);
     }
   } else {
+    const hasTopOffset = Boolean(properties.marginTop ?? properties.top);
     applyContainerOffsetPosition(containerDiv, currentPosition, {
       isMobile: isMobileViewport,
-      top: properties.marginTop ?? properties.top,
+      top: hasTopOffset ? (properties.marginTop ?? properties.top) : "",
       bottom: properties.marginBottom ?? properties.bottom,
       right: properties.marginRight ?? properties.right,
     });
