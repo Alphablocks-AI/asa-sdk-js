@@ -24,6 +24,7 @@ export const WRAPPER_EDGE_OFFSET_MOBILE = "16px";
 export type ContainerOffsetPositionOpts = {
   isMobile?: boolean;
   bottom?: string;
+  top?: string;
   right?: string;
   left?: string;
 };
@@ -62,8 +63,8 @@ export function applyContainerOffsetPosition(
   const defaultOffset = opts.isMobile ? WRAPPER_EDGE_OFFSET_MOBILE : WRAPPER_EDGE_OFFSET_DESKTOP;
   const custom = getCustomOffsets();
 
-  container.style.top = "";
   container.style.margin = "";
+  container.style.top = opts.top ?? custom.top ?? "";
   container.style.bottom = opts.bottom ?? custom.bottom ?? defaultOffset;
 
   switch (position) {
@@ -194,6 +195,7 @@ export function setCustomOffsets(offsets: CustomCSSProperties): void {
     bottom: offsets.bottom,
     right: offsets.right,
     left: offsets.left,
+    top: offsets.top,
   });
 }
 

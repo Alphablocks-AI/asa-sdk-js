@@ -1,6 +1,7 @@
 import {
   ALPHABLOCKS_WRAPPER_ID,
   CHATBOT_URL,
+  CHAT_IFRAME_VIEWPORT_HEIGHT,
   EMBED_MOBILE_MAX_INNER_WIDTH_PX,
   MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX,
 } from "../constants/index.ts";
@@ -98,8 +99,8 @@ export function createIFrame(
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
   iframe.src = buildWidgetIframeSrc(token, version, theme);
-  iframe.style.width = version === 1 ? width : "560px";
-  iframe.style.height = version === 1 ? "60px" : "575px";
+  iframe.style.width = version === 1 ? width : "480px";
+  iframe.style.height = version === 1 ? "60px" : CHAT_IFRAME_VIEWPORT_HEIGHT;
   iframe.style.border = "none";
   iframe.style.background = "transparent";
   iframe.style.display = "block";
@@ -224,6 +225,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   } else {
     applyContainerOffsetPosition(containerDiv, currentPosition, {
       isMobile: isMobileViewport,
+      top: properties.marginTop ?? properties.top,
       bottom: properties.marginBottom ?? properties.bottom,
       right: properties.marginRight ?? properties.right,
     });

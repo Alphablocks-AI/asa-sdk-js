@@ -33,3 +33,12 @@ export const EMBED_MOBILE_MAX_INNER_WIDTH_PX = 500;
  * tiny jitter. Widget-side coupling: only `mobileNudgeView` uses this path.
  */
 export const MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX = 10;
+
+/** Keep in sync with Asa-MonoRepo `HOST_IFRAME_CHAT_MIN_HEIGHT_PX`. */
+export const CHAT_IFRAME_MIN_HEIGHT_PX = 575;
+/** Keep in sync with Asa-MonoRepo `HOST_IFRAME_CHAT_MAX_HEIGHT_PX`. */
+export const CHAT_IFRAME_MAX_HEIGHT_PX = 720;
+/** Keep in sync with Asa-MonoRepo `HOST_IFRAME_EDGE_MARGIN_PX` / `WRAPPER_EDGE_OFFSET_DESKTOP`. */
+export const CHAT_IFRAME_EDGE_MARGIN_PX = 24;
+/** Desktop chat iframe height — viewport minus symmetric margins, clamped to min/max. */
+export const CHAT_IFRAME_VIEWPORT_HEIGHT = `min(${CHAT_IFRAME_MAX_HEIGHT_PX}px, max(${CHAT_IFRAME_MIN_HEIGHT_PX}px, calc(100dvh - ${CHAT_IFRAME_EDGE_MARGIN_PX * 2}px)))`;
