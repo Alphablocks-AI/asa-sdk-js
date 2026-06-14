@@ -30,6 +30,7 @@ export interface EventDataType {
   right?: string;
   bottom?: string;
   left?: string;
+  top?: string;
   cart?: string;
   cart_sig?: string;
   assistantId?: number;
@@ -37,6 +38,10 @@ export interface EventDataType {
   variantId?: number;
   quantity?: number;
   event?: string;
+  frameBorderRadius?: string;
+  marginBottom?: string;
+  marginTop?: string;
+  marginRight?: string;
   query?: string;
   searchQuery?: string;
   hasProducts?: boolean;
@@ -48,4 +53,6 @@ export interface EventDataType {
 export interface CustomCSSProperties {
   bottom?: string;
   right?: string;
+  left?: string;
+  top?: string;
 }

@@ -1,4 +1,4 @@
-import { CHATBOT_URL } from "../constants/index.ts";
+import { getIframePostMessageTarget } from "./post-message-target.ts";
 
 export function generateRandomString(length: number): string {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
@@ -48,5 +48,5 @@ export function sendCookie(
     data,
   };
   if (!iframe || !iframe.contentWindow) return;
-  iframe.contentWindow.postMessage(message, CHATBOT_URL);
+  iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
 }
