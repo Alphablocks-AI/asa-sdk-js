@@ -6,9 +6,9 @@ import replace from "@rollup/plugin-replace";
 const sdkUrl = process.env.SDK_URL ?? "";
 const isLocalBuild =
   sdkUrl.includes("localhost") || sdkUrl.includes("127.0.0.1") || sdkUrl.includes("[::1]");
-/** Staging widget host — outputs dist-dev/ (loaded by embed-dev.js at package root). */
+/** Staging widget — dist-dev/ (published; loaded by embed-dev.js from unpkg). */
 const isStagingWidget = sdkUrl.includes("dev-widget");
-const outputDir = isLocalBuild || isStagingWidget ? "dist-dev" : "dist";
+const outputDir = isLocalBuild ? "dist-local" : isStagingWidget ? "dist-dev" : "dist";
 
 const API_URL =
   process.env.API_URL ??

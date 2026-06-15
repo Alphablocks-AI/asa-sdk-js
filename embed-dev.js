@@ -14,12 +14,8 @@
  * Staging / hosted usage (same pattern as embed.js):
  *   <script defer src="https://unpkg.com/asa-sdk@latest/embed-dev.js" data-token="pk_..."></script>
  *
- * Local usage (serve the asa-sdk-js package root; run npm run build:nudge-dev):
- *   <script defer src="./embed-dev.js" data-token="pk_..."></script>
- *   <script defer src="/asa-sdk-js/embed-dev.js" data-token="pk_..."></script>
- *
- * Do not place this file inside dist-dev/ — it must sit beside dist-dev/ (package root),
- * mirroring how embed.js sits beside dist/.
+ * Local: run npm run build:nudge-dev, then <script defer src="./embed-dev.js" data-token="pk_..."></script>
+ * (loads dist-local/ on localhost, dist-dev/ from unpkg)
  *
  * Optional user id: data-user-id on this script, or window.alphablocksConfig.userId / window.ALPHABLOCKS_USER_ID.
  *
@@ -35,19 +31,32 @@
   /** Only AlphaBlocks loader URLs (avoids matching unrelated scripts with "embed" in the path). */
   const LOADER_SCRIPT_SELECTOR = 'script[src*="embed-dev.js"], script[src*="embed.js"]';
 
-  /**
-   * When served as .../embed-dev.js, load the UMD from the same base path (.../dist-dev/index.umd.js)
-   * so npm dist-tags and version pins stay aligned with this file.
-   */
+  function sdkUrlFromEmbedDevSrc(src) {
+    if (!src || !/\/embed-dev\.js(\?|#|$)/i.test(src)) return null;
+    let bundleDir = "dist-dev";
+    try {
+      const host = new URL(src, window.location.href).hostname;
+      if (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "[::1]" ||
+        src.startsWith("file:")
+      ) {
+        bundleDir = "dist-local";
+      }
+    } catch {
+      /* keep dist-dev default */
+    }
+    return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, `/${bundleDir}/index.umd.js$1`);
+  }
+
   function defaultSdkUrlFromCurrentScript() {
     try {
       const src =
         typeof document !== "undefined" && document.currentScript && document.currentScript.src;
-      if (src && /\/embed-dev\.js(\?|#|$)/i.test(src)) {
-        return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, "/dist-dev/index.umd.js$1");
-      }
+      return sdkUrlFromEmbedDevSrc(src);
     } catch {
-      /* currentScript / URL resolution unavailable — use explicit SDK_URL or CDN default */
+      /* currentScript / URL resolution unavailable */
     }
     return null;
   }
@@ -56,10 +65,8 @@
     try {
       const scripts = document.querySelectorAll('script[src*="embed-dev.js"]');
       for (let i = scripts.length - 1; i >= 0; i--) {
-        const src = scripts[i].src;
-        if (src && /\/embed-dev\.js(\?|#|$)/i.test(src)) {
-          return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, "/dist-dev/index.umd.js$1");
-        }
+        const resolved = sdkUrlFromEmbedDevSrc(scripts[i].src);
+        if (resolved) return resolved;
       }
     } catch {
       /* DOM unavailable */
@@ -172,33 +179,12 @@
     }
   }
 
-  function isDevBundleScript(scriptEl) {
-    if (!scriptEl || !scriptEl.src) return false;
-    return /\/dist-dev\/index\.umd\.js(\?|#|$)/i.test(scriptEl.src);
-  }
-
-  /**
-   * Load SDK script if not already loaded
-   */
   function loadSDK(token, userId) {
     if (window.AlphaBlocks) {
-      const loadedDevSdk = document.querySelector(`script[src="${SDK_URL}"]`);
-      if (loadedDevSdk && isDevBundleScript(loadedDevSdk)) {
-        initWidget(token, userId).catch((error) => {
-          console.error("AlphaBlocks: Failed to initialize widget", error);
-        });
-        return;
-      }
-
-      console.warn(
-        "AlphaBlocks: embed-dev.js found an existing SDK (likely prod). Loading dev bundle from",
-        SDK_URL,
-      );
-      try {
-        delete window.AlphaBlocks;
-      } catch {
-        window.AlphaBlocks = undefined;
-      }
+      initWidget(token, userId).catch((error) => {
+        console.error("AlphaBlocks: Failed to initialize widget", error);
+      });
+      return;
     }
 
     const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
@@ -220,11 +206,7 @@
       });
     };
     script.onerror = () => {
-      console.error(
-        "AlphaBlocks: Failed to load dev SDK from",
-        SDK_URL,
-        "— for local dev run npm run build:nudge-dev; for staging publish dist-dev via npm run build:dev",
-      );
+      console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
     };
 
     (document.head || document.body || document.documentElement).appendChild(script);
