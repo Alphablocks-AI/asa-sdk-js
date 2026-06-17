@@ -35,6 +35,7 @@ import {
 import {
   installShopifyCartFetchBridge,
   onCartBridgeIframeMounted,
+  registerCartAttributeContext,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
 import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
@@ -59,6 +60,11 @@ export class AlphaBlocks {
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
+    registerCartAttributeContext(() => ({
+      assistantId: this.assistantId,
+      endUserId: this.endUserId,
+      sessionId: this.sessionId,
+    }));
     mountNudgeDevPanelIfLocal(() => this.iframe);
     this.token = props.token;
     this.assistantName = props.name || "";
@@ -250,6 +256,9 @@ export class AlphaBlocks {
       await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
     }
     if (event === "alphablocks-add-product-to-cart") {
+      if (data.sessionId) {
+        this.sessionId = data.sessionId;
+      }
       await handleAddProductToCart(
         data.variantId,
         data.quantity,

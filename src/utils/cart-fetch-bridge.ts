@@ -1,4 +1,11 @@
 import { CART_AJAX_EVENT, type CartAjaxEventName } from "./cart-ajax-constants.ts";
+import { handleStorefrontCartLineAdded } from "./event-handler.ts";
+
+export type CartAttributeBridgeContext = {
+  assistantId: number | null;
+  endUserId: string;
+  sessionId: string;
+};
 
 /** Avoid `RequestInfo` / `RequestInit` in annotations — ESLint `no-undef` does not treat DOM lib types as defined. */
 type FetchInput = Parameters<typeof globalThis.fetch>[0];
@@ -13,10 +20,62 @@ let patched = false;
 let innerFetch: typeof fetch;
 
 let resolveIframe: () => HTMLIFrameElement | null = () => null;
+let resolveCartAttributeContext: () => CartAttributeBridgeContext | null = () => null;
 
 /** Update whenever `AlphaBlocks` assigns `this.iframe` (latest embed wins if multiple). */
 export function registerCartBridgeIframe(getIframe: () => HTMLIFrameElement | null): void {
   resolveIframe = getIframe;
+}
+
+/** Supplies assistant/end-user/session for storefront cart attribute sync. */
+export function registerCartAttributeContext(
+  getContext: () => CartAttributeBridgeContext | null,
+): void {
+  resolveCartAttributeContext = getContext;
+}
+
+function variantIdFromLine(line: UnknownRecord): number | undefined {
+  const raw = line.variant_id ?? line.id;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function variantIdsFromLines(lines: UnknownRecord[]): number[] {
+  const ids: number[] = [];
+  for (const line of lines) {
+    const id = variantIdFromLine(line);
+    if (id !== undefined) ids.push(id);
+  }
+  return ids;
+}
+
+async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
+  const variantIds = variantIdsFromLines(lines);
+  if (variantIds.length === 0) return;
+
+  const ctx = resolveCartAttributeContext();
+  if (!ctx?.assistantId || !ctx.endUserId) return;
+
+  await handleStorefrontCartLineAdded(
+    ctx.assistantId,
+    ctx.endUserId,
+    ctx.sessionId || undefined,
+    variantIds,
+  );
+}
+
+function addedLinesFromCartDiff(
+  cartBeforeAdd: UnknownRecord | null,
+  fullCart: UnknownRecord,
+): UnknownRecord[] {
+  const prevKeys = new Set(
+    (cartBeforeAdd?.items as UnknownRecord[] | undefined)?.map(lineKey) ?? [],
+  );
+  return ((fullCart.items as UnknownRecord[]) ?? []).filter((line) => !prevKeys.has(lineKey(line)));
 }
 
 function getChatbotTargetOrigin(iframe: HTMLIFrameElement): string {
@@ -309,6 +368,11 @@ async function tryNotifyCartChangeFromSectionPayload(parsed: UnknownRecord): Pro
   for (const line of added) {
     postCartLineToWidget({ ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_ADDED), cart });
   }
+  if (added.length > 0) {
+    void syncStorefrontCartAttributesForAddedLines(added).catch(() => {
+      /* storefront fetch must not break */
+    });
+  }
 
   if (removed.length === 1) {
     postCartLineToWidget({
@@ -370,6 +434,19 @@ async function onFetchSettled(
     cartSnapshotCache = fullCart;
     const body = buildAddedEventPayload(parsed, fullCart, before);
     postCartLineToWidget(body);
+
+    const addedLines = addedLinesFromCartDiff(before, fullCart);
+    const linesForAttrs =
+      addedLines.length > 0
+        ? addedLines
+        : isRecord(parsed) && parsed.product_id != null && !isFullCartJson(parsed)
+          ? [parsed as UnknownRecord]
+          : [];
+    if (linesForAttrs.length > 0) {
+      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch(() => {
+        /* storefront fetch must not break */
+      });
+    }
     return;
   }
 
