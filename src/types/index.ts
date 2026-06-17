@@ -35,6 +35,7 @@ export interface EventDataType {
   cart_sig?: string;
   assistantId?: number;
   endUserId?: string;
+  sessionId?: string;
   variantId?: number;
   quantity?: number;
   event?: string;

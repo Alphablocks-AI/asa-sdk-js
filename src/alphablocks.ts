@@ -57,6 +57,7 @@ export class AlphaBlocks {
   private iframe: HTMLIFrameElement | null = null;
   private hydratePromise: Promise<void> | null = null;
   public endUserId: string = "";
+  public sessionId: string = "";
   public userId: string = "";
   public isActive: boolean = true;
 
@@ -254,7 +255,10 @@ export class AlphaBlocks {
 
   private async handleCartUpdates(event: string, data: EventDataType): Promise<void> {
     if (event === "alphablocks-set-cart-attributes") {
-      await handleSetCartAttributes(this.assistantId, this.endUserId);
+      if (data.sessionId) {
+        this.sessionId = data.sessionId;
+      }
+      await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
     }
     if (event === "alphablocks-add-product-to-cart") {
       await handleAddProductToCart(
@@ -263,6 +267,7 @@ export class AlphaBlocks {
         this.iframe,
         this.assistantId,
         this.endUserId,
+        this.sessionId,
       );
     }
     if (event === "alphablocks-get-cart-details") {

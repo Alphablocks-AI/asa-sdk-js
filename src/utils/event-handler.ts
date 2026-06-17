@@ -82,6 +82,7 @@ export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
 export async function handleSetCartAttributes(
   assistantId: number | null,
   endUserId: string,
+  sessionId?: string,
 ): Promise<void> {
   if (!assistantId || !endUserId) return;
 
@@ -90,9 +91,10 @@ export async function handleSetCartAttributes(
     let cart = await getCart();
 
     // 2️⃣ Build new attributes
-    const newAttrs = {
+    const newAttrs: Record<string, string> = {
       "asa.alphablocks.ai_assistant_id": assistantId.toString(),
       "asa.alphablocks.ai_end_user_id": endUserId,
+      "asa.alphablocks.ai_session_id": sessionId ?? "",
     };
     const mergedAttrs = { ...(cart.attributes || {}), ...newAttrs };
 
@@ -133,6 +135,7 @@ export async function handleAddProductToCart(
   iframe: HTMLIFrameElement | null,
   assistantId: number | null,
   endUserId: string,
+  sessionId?: string,
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
@@ -164,6 +167,9 @@ export async function handleAddProductToCart(
       if (!updatedAttrs["asa.alphablocks.ai_end_user_id"]) {
         updatedAttrs["asa.alphablocks.ai_end_user_id"] = endUserId;
       }
+    }
+    if (!updatedAttrs["asa.alphablocks.ai_session_id"]) {
+      updatedAttrs["asa.alphablocks.ai_session_id"] = sessionId ?? "";
     }
 
     // 5) Persist attributes using the correct payload shape
