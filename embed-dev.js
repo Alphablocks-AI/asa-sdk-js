@@ -1,24 +1,21 @@
 /**
- * AlphaBlocks Widget Integration Script — development loader
+ * AlphaBlocks Widget Integration Script — staging / local development loader
  * Works in React, Next.js, and vanilla HTML
  *
  * Lifecycle: same as embed.js — one guarded init per document; a full page refresh runs init again.
  * One store / site typically uses one widget (one public token).
  *
- * Local development:
- * - Detects localhost / 127.0.0.1 / file:// and can use a local dist-dev UMD URL
- * - Serves /dist-dev/index.umd.js (see SDK_URL below)
+ * Prefer placing before </body> with defer for minimal HTML parser blocking:
+ *   <script defer src="https://unpkg.com/asa-sdk@latest/embed-dev.js" data-token="pk_..."></script>
  *
- * Usage (Local Development):
- *   <script
- *     src="http://127.0.0.1:5500/dist-dev/embed-dev.js"
- *     data-token="pk_your_token_here"
- *   ></script>
+ * Beta / pilot (npm dist-tag "next"): same snippet, swap @latest → @next. The loader resolves
+ * the UMD from the same package version as this script (no mismatch with @latest).
  *
- * Usage (Production - use embed.js instead):
- *   <script defer src="https://unpkg.com/asa-sdk@latest/embed.js" data-token="pk_..."></script>
+ * Staging / hosted usage (same pattern as embed.js):
+ *   <script defer src="https://unpkg.com/asa-sdk@latest/embed-dev.js" data-token="pk_..."></script>
  *
- * Beta: <script defer src="https://unpkg.com/asa-sdk@next/embed.js" data-token="pk_..."></script>
+ * Local: run npm run build:nudge-dev, then <script defer src="./embed-dev.js" data-token="pk_..."></script>
+ * (loads dist-local/ on localhost, dist-dev/ from unpkg)
  *
  * Optional user id: data-user-id on this script, or window.alphablocksConfig.userId / window.ALPHABLOCKS_USER_ID.
  *
@@ -26,41 +23,62 @@
  *   <script>
  *     window.ALPHABLOCKS_TOKEN = "pk_your_token_here";
  *   </script>
- *   <script src="./embed-dev.js"></script>
+ *   <script defer src="./embed-dev.js"></script>
  */
 (function () {
   "use strict";
 
-  const isLocal =
-    window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1" ||
-    window.location.protocol === "file:";
-
-  /** Same as embed.js — only official loader filenames, not arbitrary "embed" URL substrings. */
+  /** Only AlphaBlocks loader URLs (avoids matching unrelated scripts with "embed" in the path). */
   const LOADER_SCRIPT_SELECTOR = 'script[src*="embed-dev.js"], script[src*="embed.js"]';
 
-  /**
-   * When served as .../embed-dev.js, resolve the dev UMD from the same base path.
-   */
+  function sdkUrlFromEmbedDevSrc(src) {
+    if (!src || !/\/embed-dev\.js(\?|#|$)/i.test(src)) return null;
+    let bundleDir = "dist-dev";
+    try {
+      const host = new URL(src, window.location.href).hostname;
+      if (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "[::1]" ||
+        src.startsWith("file:")
+      ) {
+        bundleDir = "dist-local";
+      }
+    } catch {
+      /* keep dist-dev default */
+    }
+    return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, `/${bundleDir}/index.umd.js$1`);
+  }
+
   function defaultSdkUrlFromCurrentScript() {
     try {
       const src =
         typeof document !== "undefined" && document.currentScript && document.currentScript.src;
-      if (src && /\/embed-dev\.js(\?|#|$)/i.test(src)) {
-        return src.replace(/\/embed-dev\.js((\?|#).*)?$/i, "/dist-dev/index.umd.js$1");
-      }
+      return sdkUrlFromEmbedDevSrc(src);
     } catch {
       /* currentScript / URL resolution unavailable */
     }
     return null;
   }
 
+  function defaultSdkUrlFromLoaderScripts() {
+    try {
+      const scripts = document.querySelectorAll('script[src*="embed-dev.js"]');
+      for (let i = scripts.length - 1; i >= 0; i--) {
+        const resolved = sdkUrlFromEmbedDevSrc(scripts[i].src);
+        if (resolved) return resolved;
+      }
+    } catch {
+      /* DOM unavailable */
+    }
+    return null;
+  }
+
   const SDK_URL =
     window.ALPHABLOCKS_SDK_URL ||
-    (isLocal
-      ? "http://127.0.0.1:5500/dist-dev/index.umd.js"
-      : defaultSdkUrlFromCurrentScript() ||
-        "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js");
+    defaultSdkUrlFromCurrentScript() ||
+    defaultSdkUrlFromLoaderScripts() ||
+    "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js";
 
   /** Ensures one init per document; cleared automatically on full page navigation / refresh. */
   const EMBED_GUARD_KEY = "__ALPHABLOCKS_EMBED_INITIALIZED__";
@@ -161,9 +179,6 @@
     }
   }
 
-  /**
-   * Load SDK script if not already loaded
-   */
   function loadSDK(token, userId) {
     if (window.AlphaBlocks) {
       initWidget(token, userId).catch((error) => {
