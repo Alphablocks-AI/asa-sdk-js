@@ -47,6 +47,7 @@ const config = {
       targets: [
         { src: "src/styles.css", dest: outputDir },
         { src: "embed.js", dest: outputDir },
+        ...(isStagingWidget || isLocalBuild ? [{ src: "embed-dev.js", dest: outputDir }] : []),
       ],
     }),
   ],
