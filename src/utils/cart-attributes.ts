@@ -5,7 +5,6 @@ export const CART_ATTR_KEYS = {
   END_USER_ID: "asa.alphablocks.ai_end_user_id",
   SESSION_ID: "asa.alphablocks.ai_session_id",
   OLD_SESSION_ID: "asa.alphablocks.ai_old_session_id",
-  NEW_SESSION_ID: "asa.alphablocks.ai_new_session_id",
   LINE_ITEMS: "asa.alphablocks.ai_line_items",
 } as const;
 
@@ -33,8 +32,8 @@ export function shouldSyncCartAttributes(
   return resolveEffectiveSessionId(ctx, existingAttrs).length > 0;
 }
 
-export function appendLineItems(existing: string, variantIds: number[]): string {
-  if (variantIds.length === 0) return existing;
+export function appendCommaSeparated(existing: string, values: string[]): string {
+  if (values.length === 0) return existing;
 
   const seen = new Set(
     existing
@@ -43,17 +42,25 @@ export function appendLineItems(existing: string, variantIds: number[]): string 
       .filter(Boolean),
   );
 
-  for (const variantId of variantIds) {
-    seen.add(String(variantId));
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (trimmed) seen.add(trimmed);
   }
 
   return [...seen].join(", ");
 }
 
+export function appendLineItems(existing: string, variantIds: number[]): string {
+  return appendCommaSeparated(
+    existing,
+    variantIds.map((id) => String(id)),
+  );
+}
+
 /**
  * Merge ASA cart attributes onto existing Shopify cart attributes.
- * When the stored session differs from the current session, records
- * `ai_old_session_id` / `ai_new_session_id` and sets `ai_session_id` to the new value.
+ * When the stored session differs from the current session, appends the previous
+ * `ai_session_id` to `ai_old_session_id` (comma-separated, like line items).
  */
 export function buildAsaCartAttributes(
   existingAttrs: Record<string, string>,
@@ -72,8 +79,10 @@ export function buildAsaCartAttributes(
   if (nextSessionId) {
     const storedSessionId = (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
     if (storedSessionId && storedSessionId !== nextSessionId) {
-      result[CART_ATTR_KEYS.OLD_SESSION_ID] = storedSessionId;
-      result[CART_ATTR_KEYS.NEW_SESSION_ID] = nextSessionId;
+      const existingOldSessions = (existingAttrs[CART_ATTR_KEYS.OLD_SESSION_ID] ?? "").trim();
+      result[CART_ATTR_KEYS.OLD_SESSION_ID] = appendCommaSeparated(existingOldSessions, [
+        storedSessionId,
+      ]);
     }
     result[CART_ATTR_KEYS.SESSION_ID] = nextSessionId;
   }

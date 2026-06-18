@@ -163,20 +163,16 @@ export async function handleAddProductToCart(
   }
 }
 
-/** Storefront `/cart/add.js` (or section `items_added`) — sync attributes without adding via SDK. */
+/** Storefront `/cart/add.js` — sync session attrs only (no line items). */
 export async function handleStorefrontCartLineAdded(
   assistantId: number | null,
   endUserId: string,
   sessionId: string | undefined,
-  variantIds: number[],
 ): Promise<void> {
-  if (!variantIds.length) return;
-
   await syncCartAttributes({
     assistantId,
     endUserId,
     sessionId,
-    variantIdsToAppend: variantIds,
   });
 }
 

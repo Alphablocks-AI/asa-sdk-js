@@ -36,25 +36,6 @@ export function registerCartAttributeContext(
   resolveCartAttributeContext = getContext;
 }
 
-function variantIdFromLine(line: UnknownRecord): number | undefined {
-  const raw = line.variant_id ?? line.id;
-  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
-  if (typeof raw === "string") {
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-}
-
-function variantIdsFromLines(lines: UnknownRecord[]): number[] {
-  const ids: number[] = [];
-  for (const line of lines) {
-    const id = variantIdFromLine(line);
-    if (id !== undefined) ids.push(id);
-  }
-  return ids;
-}
-
 function isSdkOriginatedLine(line: UnknownRecord): boolean {
   const props = line.properties;
   if (!isRecord(props)) return false;
@@ -63,18 +44,12 @@ function isSdkOriginatedLine(line: UnknownRecord): boolean {
 
 async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
   const storefrontLines = lines.filter((line) => !isSdkOriginatedLine(line));
-  const variantIds = variantIdsFromLines(storefrontLines);
-  if (variantIds.length === 0) return;
+  if (storefrontLines.length === 0) return;
 
   const ctx = resolveCartAttributeContext();
   if (!ctx?.assistantId || !ctx.endUserId) return;
 
-  await handleStorefrontCartLineAdded(
-    ctx.assistantId,
-    ctx.endUserId,
-    ctx.sessionId || undefined,
-    variantIds,
-  );
+  await handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId || undefined);
 }
 
 function addedLinesFromCartDiff(
