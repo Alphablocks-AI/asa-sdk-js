@@ -4,7 +4,6 @@ import {
   CHAT_IFRAME_VIEWPORT_HEIGHT,
   CHAT_IFRAME_WIDTH_PX,
   EMBED_MOBILE_MAX_INNER_WIDTH_PX,
-  MOBILE_NUDGE_SCROLL_DISMISS_VIEWPORT_PERCENT,
 } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
@@ -20,51 +19,6 @@ import {
 } from "./dom.ts";
 import { resetHostScrollDepthReporter } from "./host-scroll-depth.ts";
 import { getIframePostMessageTarget } from "./post-message-target.ts";
-
-let mobileNudgeScrollCleanup: (() => void) | null = null;
-
-function teardownMobileNudgeScrollDismiss(): void {
-  if (mobileNudgeScrollCleanup) {
-    mobileNudgeScrollCleanup();
-    mobileNudgeScrollCleanup = null;
-  }
-}
-
-function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFrameElement): void {
-  teardownMobileNudgeScrollDismiss();
-
-  if (
-    properties.event !== "mobileNudgeView" ||
-    window.innerWidth > EMBED_MOBILE_MAX_INNER_WIDTH_PX
-  ) {
-    return;
-  }
-
-  const scrollRoot = document.scrollingElement ?? document.documentElement;
-  const initialY = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-  const targetOrigin = getIframePostMessageTarget(iframe);
-
-  const resolveMinScrollDeltaPx = (): number =>
-    (window.innerHeight * MOBILE_NUDGE_SCROLL_DISMISS_VIEWPORT_PERCENT) / 100;
-
-  const onScroll = (): void => {
-    const y = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-    if (Math.abs(y - initialY) < resolveMinScrollDeltaPx()) return;
-    if (!iframe.contentWindow) return;
-    iframe.contentWindow.postMessage(
-      { type: "alphablocks-dismiss-nudge-on-scroll", data: {} },
-      targetOrigin,
-    );
-    teardownMobileNudgeScrollDismiss();
-  };
-
-  window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-  document.addEventListener("scroll", onScroll, { passive: true, capture: true });
-  mobileNudgeScrollCleanup = () => {
-    window.removeEventListener("scroll", onScroll, { capture: true });
-    document.removeEventListener("scroll", onScroll, { capture: true });
-  };
-}
 
 export function setIframeAccessibleTitle(iframe: HTMLIFrameElement, assistantName: string): void {
   const label = (assistantName || "").trim();
@@ -252,8 +206,6 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
     revealFrameWrapper(frameWrapper);
     iframe.style.display = "block";
   }
-
-  syncMobileNudgeScrollDismiss(properties, iframe);
 }
 
 export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): void {
@@ -266,7 +218,6 @@ export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): voi
 }
 
 export function hideIframe(iframe: HTMLIFrameElement | null): void {
-  teardownMobileNudgeScrollDismiss();
   if (!iframe) return;
   iframe.style.display = "none";
   const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
