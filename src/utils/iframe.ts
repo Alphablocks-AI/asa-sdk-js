@@ -4,7 +4,7 @@ import {
   CHAT_IFRAME_VIEWPORT_HEIGHT,
   CHAT_IFRAME_WIDTH_PX,
   EMBED_MOBILE_MAX_INNER_WIDTH_PX,
-  MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX,
+  MOBILE_NUDGE_SCROLL_DISMISS_VIEWPORT_PERCENT,
 } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
@@ -44,9 +44,12 @@ function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFr
   const initialY = window.scrollY ?? scrollRoot.scrollTop ?? 0;
   const targetOrigin = getIframePostMessageTarget(iframe);
 
+  const resolveMinScrollDeltaPx = (): number =>
+    (window.innerHeight * MOBILE_NUDGE_SCROLL_DISMISS_VIEWPORT_PERCENT) / 100;
+
   const onScroll = (): void => {
     const y = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-    if (Math.abs(y - initialY) < MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX) return;
+    if (Math.abs(y - initialY) < resolveMinScrollDeltaPx()) return;
     if (!iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
       { type: "alphablocks-dismiss-nudge-on-scroll", data: {} },

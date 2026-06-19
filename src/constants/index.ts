@@ -32,10 +32,10 @@ export const NUDGE_DEV_ENABLED = (() => {
 export const EMBED_MOBILE_MAX_INNER_WIDTH_PX = 500;
 
 /**
- * Minimum host-page scroll delta (px) before posting `alphablocks-dismiss-nudge-on-scroll` — filters
- * tiny jitter. Widget-side coupling: only `mobileNudgeView` uses this path.
+ * Min host-page scroll distance (up or down from when the nudge appeared) before
+ * `alphablocks-dismiss-nudge-on-scroll` fires — % of viewport height. Only `mobileNudgeView`.
  */
-export const MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX = 10;
+export const MOBILE_NUDGE_SCROLL_DISMISS_VIEWPORT_PERCENT = 20;
 
 /**
  * Desktop floating chat shell width.
