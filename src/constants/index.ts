@@ -22,20 +22,13 @@ export const NUDGE_DEV_ENABLED = (() => {
 })();
 
 /**
- * Iframe `innerWidth` above this is treated as desktop by the storefront SDK’s mobile-nudge scroll
- * dismiss hook.
+ * Iframe `innerWidth` at or below this is treated as mobile layout.
  *
  * **Monorepo sync:** keep in sync with `WIDGET_EMBED_LAYOUT.mobileBreakpointPx` in
  * `Asa-MonoRepo/packages/widget-theme/src/embed-layout.ts` and widget
  * `MOBILE_WIDTH_THRESHOLD` in `apps/widget/lib/widget-events/widget-events.config.ts`.
  */
 export const EMBED_MOBILE_MAX_INNER_WIDTH_PX = 500;
-
-/**
- * Minimum host-page scroll delta (px) before posting `alphablocks-dismiss-nudge-on-scroll` — filters
- * tiny jitter. Widget-side coupling: only `mobileNudgeView` uses this path.
- */
-export const MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX = 10;
 
 /**
  * Desktop floating chat shell width.
