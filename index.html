@@ -42,6 +42,18 @@
         flex-direction: column;
         gap: 8px;
       }
+      #asa-ask-btn {
+        position: fixed;
+        top: 56px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: aqua;
+        padding: 10px;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        z-index: 2;
+      }
     </style>
     <script>
       (function () {
@@ -66,7 +78,15 @@
       <div id="alphablocks-local-dev-panels"></div>
     </div>
 
-    <script src="/dist-dev/index.umd.js"></script>
+    <button
+      id="asa-ask-btn"
+      type="button"
+      data-asa-ask-btn="What are the ingredients of this product?"
+    >
+      What are the ingredients of this product?
+    </button>
+
+    <script src="/dist-local/index.umd.js"></script>
     <script>
       const alphablocksAssistant = new AlphaBlocks({
         token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",

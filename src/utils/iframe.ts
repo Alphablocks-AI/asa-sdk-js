@@ -256,3 +256,22 @@ export function sendParentUrlParams(
   iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
   resetHostScrollDepthReporter(() => iframe);
 }
+
+export function sendOpenWithQuestion(iframe: HTMLIFrameElement | null, query: string): void {
+  const trimmed = (query || "").trim();
+  if (!trimmed || !iframe?.contentWindow) return;
+  const url = new URL(window.location.href);
+  iframe.contentWindow.postMessage(
+    {
+      type: "alphablocks-open-with-question",
+      data: {
+        query: trimmed,
+        urlPath: `${url.pathname}${url.search}`,
+        searchQuery: url.searchParams.get("q") || "",
+        hostname: window.location.hostname,
+      },
+    },
+    getIframePostMessageTarget(iframe),
+  );
+  resetHostScrollDepthReporter(() => iframe);
+}

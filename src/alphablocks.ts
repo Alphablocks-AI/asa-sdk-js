@@ -31,6 +31,7 @@ import {
   sendParentUrlParams,
   setIframeAccessibleTitle,
   setIframeSize,
+  sendOpenWithQuestion,
 } from "./utils/iframe.ts";
 import {
   installHostScrollDepthReporter,
@@ -46,6 +47,26 @@ import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev
 import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
 
 installShopifyCartFetchBridge();
+
+let asaAskButtonListenerInstalled = false;
+
+function installAsaAskButtonListener(
+  // eslint-disable-next-line no-unused-vars -- parameter name documents the callback contract
+  openWithQuestion: (question: string) => void | Promise<void>,
+): void {
+  if (typeof document === "undefined" || asaAskButtonListenerInstalled) return;
+  asaAskButtonListenerInstalled = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest("[data-asa-ask-btn]");
+    if (!btn) return;
+    event.preventDefault();
+    const question = btn.getAttribute("data-asa-ask-btn");
+    if (question) void Promise.resolve(openWithQuestion(question));
+  });
+}
 
 export class AlphaBlocks {
   private token: string;
@@ -353,6 +374,7 @@ export class AlphaBlocks {
 
   public renderWrapper(): void {
     createWrapper();
+    installAsaAskButtonListener((question) => this.openWithQuestion(question));
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
     const cachedAssistantDetails = sessionStorage.getItem(storageKey);
@@ -428,5 +450,20 @@ export class AlphaBlocks {
     const frameWrapper = getOrCreateFrameWrapper(element);
     frameWrapper.appendChild(iframe);
     syncFrameWrapperSize(frameWrapper, iframe);
+  }
+
+  public async openWithQuestion(question: string): Promise<void> {
+    const trimmed = (question || "").trim();
+    if (!trimmed) return;
+    if (this.hydratePromise) await this.hydratePromise;
+    if (!this.isActive) return;
+
+    const iframe =
+      this.iframe ??
+      (getElement(ALPHABLOCKS_WRAPPER_ID).querySelector("iframe") as HTMLIFrameElement | null);
+    if (!iframe) return;
+    this.iframe = iframe;
+
+    sendOpenWithQuestion(iframe, trimmed);
   }
 }
