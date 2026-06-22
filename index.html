@@ -42,9 +42,8 @@
         flex-direction: column;
         gap: 8px;
       }
-      #asa-ask-btn {
+      [data-asa-action] {
         position: fixed;
-        top: 56px;
         left: 50%;
         transform: translateX(-50%);
         background-color: aqua;
@@ -53,6 +52,15 @@
         outline: none;
         cursor: pointer;
         z-index: 2;
+      }
+      [data-asa-action="btn-ask"] {
+        top: 56px;
+      }
+      [data-asa-action="btn-open"] {
+        top: 104px;
+      }
+      [data-asa-action="btn-assistant-append"] {
+        top: 152px;
       }
     </style>
     <script>
@@ -79,11 +87,23 @@
     </div>
 
     <button
-      id="asa-ask-btn"
       type="button"
-      data-asa-ask-btn="What are the ingredients of this product?"
+      data-asa-action="btn-ask"
+      data-asa-message="What are the ingredients of this product?"
     >
-      What are the ingredients of this product?
+      Ask: ingredients
+    </button>
+
+    <button type="button" data-asa-action="btn-open">
+      Open chat only
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+    >
+      Nudge + question pills
     </button>
 
     <script src="/dist-local/index.umd.js"></script>

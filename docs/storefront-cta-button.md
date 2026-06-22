@@ -1,6 +1,6 @@
-# Storefront CTA buttons (`data-asa-ask-btn`)
+# Storefront CTA buttons
 
-Add a button on the store that opens Asa chat and sends a question — no page reload, no URL parameters.
+Add buttons on the store that open Asa chat — no page reload, no URL parameters.
 
 ## Prerequisites
 
@@ -16,9 +16,46 @@ Add a button on the store that opens Asa chat and sends a question — no page r
 
 2. Embed calls `renderWrapper()` + `showAssistant()` (iframe already mounted).
 
-## Add a button in the theme
+Use theme button classes (`button button--primary`, etc.) for automatic styling.
 
-Custom liquid block (product page example):
+---
+
+## Markup contract
+
+Every Asa storefront CTA button uses two data attributes:
+
+| Attribute | Required | Purpose |
+|-----------|----------|---------|
+| `data-asa-action` | Yes | What happens on click (see table below) |
+| `data-asa-message` | When `btn-ask` or `btn-assistant-append` | Text sent to chat |
+
+The SDK only handles clicks on elements with `data-asa-action` — other buttons on the page are ignored.
+
+No `id`, no `onclick`, no `href`, no `ask_asa` URL.
+
+---
+
+## Choose an action
+
+| I want to… | `data-asa-action` | `data-asa-message` |
+|------------|-------------------|--------------------|
+| Open chat only | `btn-open` | omit |
+| Open chat and send a user question | `btn-ask` | question text |
+| Open chat with assistant message + question pills | `btn-assistant-append` | assistant intro text |
+
+---
+
+## Examples
+
+**Open chat only**
+
+```html
+<button type="button" class="button button--primary" data-asa-action="btn-open">
+  Chat with us
+</button>
+```
+
+**Ask a question**
 
 ```liquid
 {% liquid
@@ -28,35 +65,49 @@ Custom liquid block (product page example):
 <button
   type="button"
   class="button button--primary"
-  data-asa-ask-btn="{{ asa_question | escape }}"
+  data-asa-action="btn-ask"
+  data-asa-message="{{ asa_question | escape }}"
 >
   {{ asa_question }}
 </button>
 ```
 
-Use theme button classes (`button button--primary`, etc.) for automatic styling.
+**Assistant intro + question pills**
 
-## Markup contract
+```liquid
+{% liquid
+  assign asa_intro = 'Happy to help you figure out if ' | append: product.title | append: ' is right for you. Tap below or ask me anything.'
+%}
 
-| Attribute | Required | Purpose |
-|-----------|----------|---------|
-| `data-asa-ask-btn` | Yes | Question text sent to chat |
-| `id="asa-ask-btn"` | Optional | For a single CTA; use only `data-asa-ask-btn` if you have multiple buttons |
+<button
+  type="button"
+  class="button button--primary"
+  data-asa-action="btn-assistant-append"
+  data-asa-message="{{ asa_intro | escape }}"
+>
+  Need help deciding?
+</button>
+```
 
-No `onclick`, no `href`, no `ask_asa` URL.
+On product pages, question pills use scenario-aware copy when nudge context is available; otherwise generic fallbacks are shown.
+
+You can place multiple Asa CTA buttons on the same page — each only needs `data-asa-action` (and `data-asa-message` when required).
+
+---
 
 ## How it works
 
 ```
-[button data-asa-ask-btn="..."]
-        ↓ click
-[SDK click listener on [data-asa-ask-btn]]
+[button data-asa-action="…"]
+        ↓ click (scoped to [data-asa-action])
+[SDK] postMessage alphablocks-storefront-action
         ↓
-openWithQuestion() → postMessage to iframe
-        ↓
-[Widget] open chat → sendMessage(question)
+[Widget] switch (action)
+  btn-open                  → resize + show chat
+  btn-ask               → show chat + sendMessage(message)
+  btn-assistant-append  → show chat + assistant message + question pills
 ```
 
 ## Local dev
 
-`index.html` has a test button with `id="asa-ask-btn"` and `data-asa-ask-btn`. Run widget on `localhost:3002`, `npm run build:local`, open `index.html`.
+`index.html` has test buttons for all three actions. Run widget on `localhost:3002`, `npm run build:local`, open `index.html`.

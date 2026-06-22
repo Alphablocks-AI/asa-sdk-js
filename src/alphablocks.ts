@@ -1,5 +1,7 @@
 import {
   ALPHABLOCKS_WRAPPER_ID,
+  ASA_STOREFRONT_ACTION_ATTR,
+  ASA_STOREFRONT_MESSAGE_ATTR,
   ASSISTANT_DETAILS_STORAGE_KEY,
   NUDGE_DEV_ENABLED,
 } from "./constants/index.ts";
@@ -31,7 +33,8 @@ import {
   sendParentUrlParams,
   setIframeAccessibleTitle,
   setIframeSize,
-  sendOpenWithQuestion,
+  sendStorefrontAction,
+  type StorefrontAction,
 } from "./utils/iframe.ts";
 import {
   installHostScrollDepthReporter,
@@ -48,23 +51,39 @@ import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
 
 installShopifyCartFetchBridge();
 
-let asaAskButtonListenerInstalled = false;
+let asaStorefrontButtonListenerInstalled = false;
 
-function installAsaAskButtonListener(
+const ASA_STOREFRONT_BTN_SELECTOR = `[${ASA_STOREFRONT_ACTION_ATTR}]`;
+
+function parseStorefrontAction(value: string | null): StorefrontAction | null {
+  const action = (value || "").trim().toLowerCase();
+  if (action === "btn-open" || action === "btn-ask" || action === "btn-assistant-append")
+    return action;
+  return null;
+}
+
+function installAsaStorefrontButtonListener(
   // eslint-disable-next-line no-unused-vars -- parameter name documents the callback contract
-  openWithQuestion: (question: string) => void | Promise<void>,
+  runStorefrontAction: (action: StorefrontAction, message?: string) => void | Promise<void>,
 ): void {
-  if (typeof document === "undefined" || asaAskButtonListenerInstalled) return;
-  asaAskButtonListenerInstalled = true;
+  if (typeof document === "undefined" || asaStorefrontButtonListenerInstalled) return;
+  asaStorefrontButtonListenerInstalled = true;
 
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const btn = target.closest("[data-asa-ask-btn]");
+
+    const btn = target.closest(ASA_STOREFRONT_BTN_SELECTOR);
     if (!btn) return;
+
+    const action = parseStorefrontAction(btn.getAttribute(ASA_STOREFRONT_ACTION_ATTR));
+    if (!action) return;
+
+    const message = (btn.getAttribute(ASA_STOREFRONT_MESSAGE_ATTR) || "").trim();
+    if ((action === "btn-ask" || action === "btn-assistant-append") && !message) return;
+
     event.preventDefault();
-    const question = btn.getAttribute("data-asa-ask-btn");
-    if (question) void Promise.resolve(openWithQuestion(question));
+    void Promise.resolve(runStorefrontAction(action, message || undefined));
   });
 }
 
@@ -374,7 +393,9 @@ export class AlphaBlocks {
 
   public renderWrapper(): void {
     createWrapper();
-    installAsaAskButtonListener((question) => this.openWithQuestion(question));
+    installAsaStorefrontButtonListener((action, message) =>
+      this.runStorefrontAction(action, message),
+    );
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
     const cachedAssistantDetails = sessionStorage.getItem(storageKey);
@@ -452,18 +473,37 @@ export class AlphaBlocks {
     syncFrameWrapperSize(frameWrapper, iframe);
   }
 
-  public async openWithQuestion(question: string): Promise<void> {
-    const trimmed = (question || "").trim();
-    if (!trimmed) return;
+  private async resolveStorefrontIframe(): Promise<HTMLIFrameElement | null> {
     if (this.hydratePromise) await this.hydratePromise;
-    if (!this.isActive) return;
+    if (!this.isActive) return null;
 
     const iframe =
       this.iframe ??
       (getElement(ALPHABLOCKS_WRAPPER_ID).querySelector("iframe") as HTMLIFrameElement | null);
-    if (!iframe) return;
+    if (!iframe) return null;
     this.iframe = iframe;
+    return iframe;
+  }
 
-    sendOpenWithQuestion(iframe, trimmed);
+  public async runStorefrontAction(action: StorefrontAction, message?: string): Promise<void> {
+    const iframe = await this.resolveStorefrontIframe();
+    if (!iframe) return;
+    sendStorefrontAction(iframe, action, message);
+  }
+
+  public async openChat(): Promise<void> {
+    await this.runStorefrontAction("btn-open");
+  }
+
+  public async openWithQuestion(question: string): Promise<void> {
+    const trimmed = (question || "").trim();
+    if (!trimmed) return;
+    await this.runStorefrontAction("btn-ask", trimmed);
+  }
+
+  public async openWithNudgeIntro(introText: string): Promise<void> {
+    const trimmed = (introText || "").trim();
+    if (!trimmed) return;
+    await this.runStorefrontAction("btn-assistant-append", trimmed);
   }
 }

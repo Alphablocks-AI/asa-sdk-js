@@ -257,21 +257,42 @@ export function sendParentUrlParams(
   resetHostScrollDepthReporter(() => iframe);
 }
 
-export function sendOpenWithQuestion(iframe: HTMLIFrameElement | null, query: string): void {
-  const trimmed = (query || "").trim();
-  if (!trimmed || !iframe?.contentWindow) return;
+export type StorefrontAction = "btn-open" | "btn-ask" | "btn-assistant-append";
+
+function buildStorefrontParentMessageData(): {
+  urlPath: string;
+  searchQuery: string;
+  hostname: string;
+} {
   const url = new URL(window.location.href);
-  iframe.contentWindow.postMessage(
-    {
-      type: "alphablocks-open-with-question",
-      data: {
-        query: trimmed,
-        urlPath: `${url.pathname}${url.search}`,
-        searchQuery: url.searchParams.get("q") || "",
-        hostname: window.location.hostname,
-      },
-    },
-    getIframePostMessageTarget(iframe),
-  );
+  return {
+    urlPath: `${url.pathname}${url.search}`,
+    searchQuery: url.searchParams.get("q") || "",
+    hostname: window.location.hostname,
+  };
+}
+
+function postStorefrontMessageToIframe(
+  iframe: HTMLIFrameElement | null,
+  type: string,
+  data: Record<string, unknown>,
+): void {
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage({ type, data }, getIframePostMessageTarget(iframe));
   resetHostScrollDepthReporter(() => iframe);
+}
+
+export function sendStorefrontAction(
+  iframe: HTMLIFrameElement | null,
+  action: StorefrontAction,
+  message?: string,
+): void {
+  const trimmedMessage = (message || "").trim();
+  if ((action === "btn-ask" || action === "btn-assistant-append") && !trimmedMessage) return;
+
+  postStorefrontMessageToIframe(iframe, "alphablocks-storefront-action", {
+    action,
+    ...(trimmedMessage ? { message: trimmedMessage } : {}),
+    ...buildStorefrontParentMessageData(),
+  });
 }
