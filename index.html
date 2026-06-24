@@ -62,6 +62,15 @@
       [data-asa-action="btn-assistant-append"] {
         top: 152px;
       }
+      [data-asa-action="btn-assistant-append"][data-asa-pill-questions] {
+        top: 200px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message]):not([data-asa-pill-questions]) {
+        top: 248px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message])[data-asa-pill-questions] {
+        top: 296px;
+      }
     </style>
     <script>
       (function () {
@@ -103,7 +112,34 @@
       data-asa-action="btn-assistant-append"
       data-asa-message="Happy to help you decide. Tap below or ask me anything."
     >
-      Nudge + question pills
+      Nudge + default question pills
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom question pills
+    </button>
+
+    <button type="button" data-asa-action="btn-assistant-append">
+      Nudge + default pills (no intro attr)
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom pills (no intro attr)
     </button>
 
     <script src="/dist-local/index.umd.js"></script>

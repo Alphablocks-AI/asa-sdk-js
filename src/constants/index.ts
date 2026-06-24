@@ -8,6 +8,7 @@ export const ASSISTANT_DETAILS_STORAGE_KEY = "alphablocks-assistant-details";
 
 export const ASA_STOREFRONT_ACTION_ATTR = "data-asa-action";
 export const ASA_STOREFRONT_MESSAGE_ATTR = "data-asa-message";
+export const ASA_STOREFRONT_PILL_QUESTIONS_ATTR = "data-asa-pill-questions";
 
 /**
  * Local-only dev harness flag.

@@ -286,13 +286,15 @@ export function sendStorefrontAction(
   iframe: HTMLIFrameElement | null,
   action: StorefrontAction,
   message?: string,
+  pillQuestions?: Array<{ label: string; userMessage: string }>,
 ): void {
   const trimmedMessage = (message || "").trim();
-  if ((action === "btn-ask" || action === "btn-assistant-append") && !trimmedMessage) return;
+  if (action === "btn-ask" && !trimmedMessage) return;
 
   postStorefrontMessageToIframe(iframe, "alphablocks-storefront-action", {
     action,
     ...(trimmedMessage ? { message: trimmedMessage } : {}),
+    ...(pillQuestions?.length ? { pillQuestions } : {}),
     ...buildStorefrontParentMessageData(),
   });
 }

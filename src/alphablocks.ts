@@ -2,6 +2,7 @@ import {
   ALPHABLOCKS_WRAPPER_ID,
   ASA_STOREFRONT_ACTION_ATTR,
   ASA_STOREFRONT_MESSAGE_ATTR,
+  ASA_STOREFRONT_PILL_QUESTIONS_ATTR,
   ASSISTANT_DETAILS_STORAGE_KEY,
   NUDGE_DEV_ENABLED,
 } from "./constants/index.ts";
@@ -48,6 +49,10 @@ import {
 } from "./utils/cart-fetch-bridge.ts";
 import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
 import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
+import {
+  parseStorefrontPillQuestions,
+  type StorefrontPillQuestion,
+} from "./utils/storefront-pill-questions.ts";
 
 installShopifyCartFetchBridge();
 
@@ -60,31 +65,6 @@ function parseStorefrontAction(value: string | null): StorefrontAction | null {
   if (action === "btn-open" || action === "btn-ask" || action === "btn-assistant-append")
     return action;
   return null;
-}
-
-function installAsaStorefrontButtonListener(
-  // eslint-disable-next-line no-unused-vars -- parameter name documents the callback contract
-  runStorefrontAction: (action: StorefrontAction, message?: string) => void | Promise<void>,
-): void {
-  if (typeof document === "undefined" || asaStorefrontButtonListenerInstalled) return;
-  asaStorefrontButtonListenerInstalled = true;
-
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const btn = target.closest(ASA_STOREFRONT_BTN_SELECTOR);
-    if (!btn) return;
-
-    const action = parseStorefrontAction(btn.getAttribute(ASA_STOREFRONT_ACTION_ATTR));
-    if (!action) return;
-
-    const message = (btn.getAttribute(ASA_STOREFRONT_MESSAGE_ATTR) || "").trim();
-    if ((action === "btn-ask" || action === "btn-assistant-append") && !message) return;
-
-    event.preventDefault();
-    void Promise.resolve(runStorefrontAction(action, message || undefined));
-  });
 }
 
 export class AlphaBlocks {
@@ -393,8 +373,8 @@ export class AlphaBlocks {
 
   public renderWrapper(): void {
     createWrapper();
-    installAsaStorefrontButtonListener((action, message) =>
-      this.runStorefrontAction(action, message),
+    installAsaStorefrontButtonListener((action, message, pillQuestions) =>
+      this.runStorefrontAction(action, message, pillQuestions),
     );
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
@@ -485,10 +465,14 @@ export class AlphaBlocks {
     return iframe;
   }
 
-  public async runStorefrontAction(action: StorefrontAction, message?: string): Promise<void> {
+  public async runStorefrontAction(
+    action: StorefrontAction,
+    message?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
     const iframe = await this.resolveStorefrontIframe();
     if (!iframe) return;
-    sendStorefrontAction(iframe, action, message);
+    sendStorefrontAction(iframe, action, message, pillQuestions);
   }
 
   public async openChat(): Promise<void> {
@@ -501,9 +485,40 @@ export class AlphaBlocks {
     await this.runStorefrontAction("btn-ask", trimmed);
   }
 
-  public async openWithNudgeIntro(introText: string): Promise<void> {
+  public async openWithNudgeIntro(
+    introText?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
     const trimmed = (introText || "").trim();
-    if (!trimmed) return;
-    await this.runStorefrontAction("btn-assistant-append", trimmed);
+    await this.runStorefrontAction("btn-assistant-append", trimmed || undefined, pillQuestions);
   }
+}
+
+type RunStorefrontActionFn = AlphaBlocks["runStorefrontAction"];
+
+function installAsaStorefrontButtonListener(runStorefrontAction: RunStorefrontActionFn): void {
+  if (typeof document === "undefined" || asaStorefrontButtonListenerInstalled) return;
+  asaStorefrontButtonListenerInstalled = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const btn = target.closest(ASA_STOREFRONT_BTN_SELECTOR);
+    if (!btn) return;
+
+    const action = parseStorefrontAction(btn.getAttribute(ASA_STOREFRONT_ACTION_ATTR));
+    if (!action) return;
+
+    const message = (btn.getAttribute(ASA_STOREFRONT_MESSAGE_ATTR) || "").trim();
+    if (action === "btn-ask" && !message) return;
+
+    const pillQuestions =
+      action === "btn-assistant-append"
+        ? parseStorefrontPillQuestions(btn.getAttribute(ASA_STOREFRONT_PILL_QUESTIONS_ATTR))
+        : undefined;
+
+    event.preventDefault();
+    void runStorefrontAction(action, message || undefined, pillQuestions);
+  });
 }
