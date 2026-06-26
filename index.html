@@ -42,6 +42,35 @@
         flex-direction: column;
         gap: 8px;
       }
+      [data-asa-action] {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: aqua;
+        padding: 10px;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        z-index: 2;
+      }
+      [data-asa-action="btn-ask"] {
+        top: 56px;
+      }
+      [data-asa-action="btn-open"] {
+        top: 104px;
+      }
+      [data-asa-action="btn-assistant-append"] {
+        top: 152px;
+      }
+      [data-asa-action="btn-assistant-append"][data-asa-pill-questions] {
+        top: 200px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message]):not([data-asa-pill-questions]) {
+        top: 248px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message])[data-asa-pill-questions] {
+        top: 296px;
+      }
     </style>
     <script>
       (function () {
@@ -66,7 +95,54 @@
       <div id="alphablocks-local-dev-panels"></div>
     </div>
 
-    <script src="/dist-dev/index.umd.js"></script>
+    <button
+      type="button"
+      data-asa-action="btn-ask"
+      data-asa-message="What are the ingredients of this product?"
+    >
+      Ask: ingredients
+    </button>
+
+    <button type="button" data-asa-action="btn-open">
+      Open chat only
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+    >
+      Nudge + default question pills
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom question pills
+    </button>
+
+    <button type="button" data-asa-action="btn-assistant-append">
+      Nudge + default pills (no intro attr)
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom pills (no intro attr)
+    </button>
+
+    <script src="/dist-local/index.umd.js"></script>
     <script>
       const alphablocksAssistant = new AlphaBlocks({
         token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",

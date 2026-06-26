@@ -256,3 +256,45 @@ export function sendParentUrlParams(
   iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
   resetHostScrollDepthReporter(() => iframe);
 }
+
+export type StorefrontAction = "btn-open" | "btn-ask" | "btn-assistant-append";
+
+function buildStorefrontParentMessageData(): {
+  urlPath: string;
+  searchQuery: string;
+  hostname: string;
+} {
+  const url = new URL(window.location.href);
+  return {
+    urlPath: `${url.pathname}${url.search}`,
+    searchQuery: url.searchParams.get("q") || "",
+    hostname: window.location.hostname,
+  };
+}
+
+function postStorefrontMessageToIframe(
+  iframe: HTMLIFrameElement | null,
+  type: string,
+  data: Record<string, unknown>,
+): void {
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage({ type, data }, getIframePostMessageTarget(iframe));
+  resetHostScrollDepthReporter(() => iframe);
+}
+
+export function sendStorefrontAction(
+  iframe: HTMLIFrameElement | null,
+  action: StorefrontAction,
+  message?: string,
+  pillQuestions?: Array<{ label: string; userMessage: string }>,
+): void {
+  const trimmedMessage = (message || "").trim();
+  if (action === "btn-ask" && !trimmedMessage) return;
+
+  postStorefrontMessageToIframe(iframe, "alphablocks-storefront-action", {
+    action,
+    ...(trimmedMessage ? { message: trimmedMessage } : {}),
+    ...(pillQuestions?.length ? { pillQuestions } : {}),
+    ...buildStorefrontParentMessageData(),
+  });
+}

@@ -1,5 +1,8 @@
 import {
   ALPHABLOCKS_WRAPPER_ID,
+  ASA_STOREFRONT_ACTION_ATTR,
+  ASA_STOREFRONT_MESSAGE_ATTR,
+  ASA_STOREFRONT_PILL_QUESTIONS_ATTR,
   ASSISTANT_DETAILS_STORAGE_KEY,
   NUDGE_DEV_ENABLED,
 } from "./constants/index.ts";
@@ -31,6 +34,8 @@ import {
   sendParentUrlParams,
   setIframeAccessibleTitle,
   setIframeSize,
+  sendStorefrontAction,
+  type StorefrontAction,
 } from "./utils/iframe.ts";
 import {
   installHostScrollDepthReporter,
@@ -44,8 +49,23 @@ import {
 } from "./utils/cart-fetch-bridge.ts";
 import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
 import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
+import {
+  parseStorefrontPillQuestions,
+  type StorefrontPillQuestion,
+} from "./utils/storefront-pill-questions.ts";
 
 installShopifyCartFetchBridge();
+
+let asaStorefrontButtonListenerInstalled = false;
+
+const ASA_STOREFRONT_BTN_SELECTOR = `[${ASA_STOREFRONT_ACTION_ATTR}]`;
+
+function parseStorefrontAction(value: string | null): StorefrontAction | null {
+  const action = (value || "").trim().toLowerCase();
+  if (action === "btn-open" || action === "btn-ask" || action === "btn-assistant-append")
+    return action;
+  return null;
+}
 
 export class AlphaBlocks {
   private token: string;
@@ -353,6 +373,9 @@ export class AlphaBlocks {
 
   public renderWrapper(): void {
     createWrapper();
+    installAsaStorefrontButtonListener((action, message, pillQuestions) =>
+      this.runStorefrontAction(action, message, pillQuestions),
+    );
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
     const cachedAssistantDetails = sessionStorage.getItem(storageKey);
@@ -429,4 +452,73 @@ export class AlphaBlocks {
     frameWrapper.appendChild(iframe);
     syncFrameWrapperSize(frameWrapper, iframe);
   }
+
+  private async resolveStorefrontIframe(): Promise<HTMLIFrameElement | null> {
+    if (this.hydratePromise) await this.hydratePromise;
+    if (!this.isActive) return null;
+
+    const iframe =
+      this.iframe ??
+      (getElement(ALPHABLOCKS_WRAPPER_ID).querySelector("iframe") as HTMLIFrameElement | null);
+    if (!iframe) return null;
+    this.iframe = iframe;
+    return iframe;
+  }
+
+  public async runStorefrontAction(
+    action: StorefrontAction,
+    message?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
+    const iframe = await this.resolveStorefrontIframe();
+    if (!iframe) return;
+    sendStorefrontAction(iframe, action, message, pillQuestions);
+  }
+
+  public async openChat(): Promise<void> {
+    await this.runStorefrontAction("btn-open");
+  }
+
+  public async openWithQuestion(question: string): Promise<void> {
+    const trimmed = (question || "").trim();
+    if (!trimmed) return;
+    await this.runStorefrontAction("btn-ask", trimmed);
+  }
+
+  public async openWithNudgeIntro(
+    introText?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
+    const trimmed = (introText || "").trim();
+    await this.runStorefrontAction("btn-assistant-append", trimmed || undefined, pillQuestions);
+  }
+}
+
+type RunStorefrontActionFn = AlphaBlocks["runStorefrontAction"];
+
+function installAsaStorefrontButtonListener(runStorefrontAction: RunStorefrontActionFn): void {
+  if (typeof document === "undefined" || asaStorefrontButtonListenerInstalled) return;
+  asaStorefrontButtonListenerInstalled = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const btn = target.closest(ASA_STOREFRONT_BTN_SELECTOR);
+    if (!btn) return;
+
+    const action = parseStorefrontAction(btn.getAttribute(ASA_STOREFRONT_ACTION_ATTR));
+    if (!action) return;
+
+    const message = (btn.getAttribute(ASA_STOREFRONT_MESSAGE_ATTR) || "").trim();
+    if (action === "btn-ask" && !message) return;
+
+    const pillQuestions =
+      action === "btn-assistant-append"
+        ? parseStorefrontPillQuestions(btn.getAttribute(ASA_STOREFRONT_PILL_QUESTIONS_ATTR))
+        : undefined;
+
+    event.preventDefault();
+    void runStorefrontAction(action, message || undefined, pillQuestions);
+  });
 }
