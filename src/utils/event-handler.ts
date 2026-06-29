@@ -161,13 +161,11 @@ export async function handleStorefrontCartLineAdded(
   assistantId: number | null,
   endUserId: string,
   sessionId: string | undefined,
-  variantIdsToAppend?: number[],
 ): Promise<void> {
   await syncCartAttributes({
     assistantId,
     endUserId,
     sessionId,
-    variantIdsToAppend,
   });
 }
 

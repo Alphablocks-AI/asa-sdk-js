@@ -49,20 +49,7 @@ async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[])
   const ctx = resolveCartAttributeContext();
   if (!ctx?.assistantId || !ctx.endUserId) return;
 
-  const variantIds = storefrontLines
-    .map((line) => {
-      const id = line.variant_id;
-      const parsed = typeof id === "number" ? id : parseInt(String(id ?? ""), 10);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-    })
-    .filter((id): id is number => id !== null);
-
-  await handleStorefrontCartLineAdded(
-    ctx.assistantId,
-    ctx.endUserId,
-    ctx.sessionId || undefined,
-    variantIds.length > 0 ? variantIds : undefined,
-  );
+  await handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId || undefined);
 }
 
 function addedLinesFromCartDiff(
@@ -432,17 +419,33 @@ async function onFetchSettled(
     const body = buildAddedEventPayload(parsed, fullCart, before);
     postCartLineToWidget(body);
 
+    // Derive added lines from response directly, not just from diff
     const addedLines = addedLinesFromCartDiff(before, fullCart);
-    const linesForAttrs =
-      addedLines.length > 0
-        ? addedLines
-        : isRecord(parsed) && parsed.product_id != null && !isFullCartJson(parsed)
-          ? [parsed as UnknownRecord]
-          : [];
+
+    const linesForAttrs: UnknownRecord[] = (() => {
+      // 1. Diff found new lines — most reliable
+      if (addedLines.length > 0) return addedLines;
+
+      // 2. Response is a single line item directly
+      if (isRecord(parsed) && parsed.product_id != null && !isFullCartJson(parsed)) {
+        return [parsed as UnknownRecord];
+      }
+
+      // 3. Response is { items: [...] } wrapper (not full cart)
+      if (isRecord(parsed) && Array.isArray(parsed.items) && !isFullCartJson(parsed)) {
+        return (parsed.items as unknown[]).filter(isRecord);
+      }
+
+      // 4. Last resort — use buildAddedEventPayload's identified line from full cart
+      // Extract which line was identified as "added" from the event payload
+      const eventLine = (fullCart.items as UnknownRecord[])?.find(
+        (line) => lineKey(line) === lineKey(body as UnknownRecord),
+      );
+      return eventLine ? [eventLine] : [];
+    })();
+
     if (linesForAttrs.length > 0) {
-      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch(() => {
-        /* storefront fetch must not break */
-      });
+      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch(() => {});
     }
     return;
   }
