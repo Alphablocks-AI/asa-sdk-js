@@ -49,7 +49,20 @@ async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[])
   const ctx = resolveCartAttributeContext();
   if (!ctx?.assistantId || !ctx.endUserId) return;
 
-  await handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId || undefined);
+  const variantIds = storefrontLines
+    .map((line) => {
+      const id = line.variant_id;
+      const parsed = typeof id === "number" ? id : parseInt(String(id ?? ""), 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    })
+    .filter((id): id is number => id !== null);
+
+  await handleStorefrontCartLineAdded(
+    ctx.assistantId,
+    ctx.endUserId,
+    ctx.sessionId || undefined,
+    variantIds.length > 0 ? variantIds : undefined,
+  );
 }
 
 function addedLinesFromCartDiff(

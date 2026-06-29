@@ -284,6 +284,9 @@ export class AlphaBlocks {
       if (data.sessionId) {
         this.sessionId = data.sessionId;
       }
+      // Wait for hydration before writing — assistantId is null until this resolves
+      if (this.hydratePromise) await this.hydratePromise;
+      if (!this.assistantId || !this.endUserId) return; // still unresolved, skip
       await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
     }
     if (event === "alphablocks-add-product-to-cart") {
