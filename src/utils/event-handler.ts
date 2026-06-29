@@ -1,6 +1,7 @@
 import { addToCart, getCart, getSearchProductsCount } from "./api.ts";
 import {
   buildAsaCartAttributes,
+  CART_ATTR_KEYS,
   persistCartAttributes,
   resolveEffectiveSessionId,
   shouldSyncCartAttributes,
@@ -110,15 +111,22 @@ export async function handleAddProductToCart(
   if (!variantId || !iframe?.contentWindow) return;
 
   try {
-    // 1) Add item to cart
     await addToCart(variantId, quantity);
 
-    // 2) Read the cart (source of truth)
     const cart = await getCart();
     const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
-    const attrCtx = { assistantId, endUserId, sessionId, variantIdsToAppend: [variantId] };
 
-    // 3) Persist attributes only when a chat session exists (add-to-cart still succeeds)
+    // Race-condition guard: if widget didn't send sessionId yet, read from cart
+    const resolvedSessionId =
+      (sessionId ?? "").trim() || (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
+
+    const attrCtx = {
+      assistantId,
+      endUserId,
+      sessionId: resolvedSessionId,
+      variantIdsToAppend: [variantId],
+    };
+
     if (shouldSyncCartAttributes(attrCtx, existingAttrs)) {
       const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
       const updatedAttrs = buildAsaCartAttributes(existingAttrs, {
@@ -128,27 +136,11 @@ export async function handleAddProductToCart(
       await persistCartAttributes(cart.item_count ?? 0, updatedAttrs);
     }
 
-    // 4) Refresh storefront cart UI silently (theme-agnostic)
     await refreshCartUI();
 
-    // 5) Fetch final cart state (after attributes + UI refresh)
     const finalCart = await getCart();
-    const responseAttrs = shouldSyncCartAttributes(attrCtx, existingAttrs)
-      ? buildAsaCartAttributes(existingAttrs, {
-          ...attrCtx,
-          sessionId: resolveEffectiveSessionId(attrCtx, existingAttrs),
-        })
-      : (finalCart.attributes ?? {});
-
-    // 6) Post success response back to iframe
     iframe.contentWindow.postMessage(
-      {
-        type: ADD_PRODUCT_TO_CART_RESPONSE,
-        data: {
-          success: true,
-          cart: { ...finalCart, attributes: responseAttrs },
-        },
-      },
+      { type: ADD_PRODUCT_TO_CART_RESPONSE, data: { success: true, cart: finalCart } },
       "*",
     );
   } catch (err) {
@@ -168,11 +160,13 @@ export async function handleStorefrontCartLineAdded(
   assistantId: number | null,
   endUserId: string,
   sessionId: string | undefined,
+  variantIdsToAppend?: number[],
 ): Promise<void> {
   await syncCartAttributes({
     assistantId,
     endUserId,
     sessionId,
+    variantIdsToAppend,
   });
 }
 
