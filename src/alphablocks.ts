@@ -81,6 +81,7 @@ export class AlphaBlocks {
   public sessionId: string = "";
   public userId: string = "";
   public isActive: boolean = true;
+  private cartUpdateQueue: Promise<void> = Promise.resolve();
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
@@ -279,35 +280,42 @@ export class AlphaBlocks {
     }
   }
 
-  private async handleCartUpdates(event: string, data: EventDataType): Promise<void> {
-    if (event === "alphablocks-set-cart-attributes") {
-      if (data.sessionId) {
-        this.sessionId = data.sessionId;
-      }
-      // Wait for hydration before writing — assistantId is null until this resolves
-      if (this.hydratePromise) await this.hydratePromise;
-      if (!this.assistantId || !this.endUserId) return; // still unresolved, skip
-      await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
+  private handleCartUpdates(event: string, data: EventDataType): void {
+    // Capture sessionId synchronously before queuing
+    if (
+      (event === "alphablocks-set-cart-attributes" ||
+        event === "alphablocks-add-product-to-cart") &&
+      data.sessionId
+    ) {
+      this.sessionId = data.sessionId;
     }
-    if (event === "alphablocks-add-product-to-cart") {
-      if (data.sessionId) {
-        this.sessionId = data.sessionId;
-      }
-      await handleAddProductToCart(
-        data.variantId,
-        data.quantity,
-        this.iframe,
-        this.assistantId,
-        this.endUserId,
-        this.sessionId,
-      );
-    }
-    if (event === "alphablocks-get-cart-details") {
-      await handleGetCartDetails(this.iframe);
-    }
-    if (event === "alphablocks-check-search-products") {
-      await handleCheckSearchProducts(data.query || "", this.iframe);
-    }
+
+    // Serialize all cart writes — prevents concurrent getCart/persist race
+    this.cartUpdateQueue = this.cartUpdateQueue
+      .then(async () => {
+        if (event === "alphablocks-set-cart-attributes") {
+          await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
+        }
+        if (event === "alphablocks-add-product-to-cart") {
+          await handleAddProductToCart(
+            data.variantId,
+            data.quantity,
+            this.iframe,
+            this.assistantId,
+            this.endUserId,
+            this.sessionId,
+          );
+        }
+        if (event === "alphablocks-get-cart-details") {
+          await handleGetCartDetails(this.iframe);
+        }
+        if (event === "alphablocks-check-search-products") {
+          await handleCheckSearchProducts(data.query || "", this.iframe);
+        }
+      })
+      .catch((err) => {
+        console.error("[ASA] cartUpdateQueue error:", err);
+      });
   }
 
   public renderPill(container: string | HTMLElement): void {

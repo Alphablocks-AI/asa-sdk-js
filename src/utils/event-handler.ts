@@ -46,6 +46,7 @@ export async function refreshCartUI(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           updates: { [key]: cart.items[0].quantity },
+          attributes: cart.attributes ?? {}, // ← ADD THIS
         }),
       });
     }

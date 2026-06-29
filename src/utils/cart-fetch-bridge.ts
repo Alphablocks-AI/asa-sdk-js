@@ -459,6 +459,17 @@ async function onFetchSettled(
     const decremented = findQuantityDecrementedLines(prevItems, nextItems);
     cartSnapshotCache = newCart;
 
+    // Re-write ASA attrs if theme update wiped them
+    const attrs = (newCart.attributes as Record<string, string>) ?? {};
+    if (!attrs["asa.alphablocks.ai_session_id"]) {
+      const ctx = resolveCartAttributeContext();
+      if (ctx?.assistantId && ctx.endUserId && ctx.sessionId) {
+        void handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId).catch(
+          () => {},
+        );
+      }
+    }
+
     const linesToNotify = [...removed, ...decremented];
     if (linesToNotify.length === 0) return;
 
