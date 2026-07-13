@@ -45,10 +45,17 @@ export interface EventDataType {
   marginRight?: string;
   query?: string;
   searchQuery?: string;
+  handle?: string;
   hasProducts?: boolean;
   productCount?: number;
   success?: boolean;
   error?: string;
+  product?: {
+    id?: number;
+    title?: string;
+    handle?: string;
+    price?: number;
+  } | null;
 }
 
 export interface CustomCSSProperties {

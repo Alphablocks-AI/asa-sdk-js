@@ -24,6 +24,7 @@ import {
   handleAddProductToCart,
   handleCheckSearchProducts,
   handleGetCartDetails,
+  handleGetProductByHandle,
   handleSetCartAttributes,
 } from "./utils/event-handler.ts";
 import {
@@ -161,6 +162,9 @@ export class AlphaBlocks {
       case "alphablocks-check-search-products":
         this.handleCartUpdates("alphablocks-check-search-products", data);
         break;
+      case "alphablocks-get-product-by-handle":
+        this.handleCartUpdates("alphablocks-get-product-by-handle", data);
+        break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
@@ -289,7 +293,6 @@ export class AlphaBlocks {
     ) {
       this.sessionId = data.sessionId;
     }
-
     // Serialize all cart writes — prevents concurrent getCart/persist race
     this.cartUpdateQueue = this.cartUpdateQueue
       .then(async () => {
@@ -311,6 +314,9 @@ export class AlphaBlocks {
         }
         if (event === "alphablocks-check-search-products") {
           await handleCheckSearchProducts(data.query || "", this.iframe);
+        }
+        if (event === "alphablocks-get-product-by-handle") {
+          await handleGetProductByHandle(data.handle || "", this.iframe);
         }
       })
       .catch((err) => {
