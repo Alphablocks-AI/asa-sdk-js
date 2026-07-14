@@ -30,22 +30,37 @@ export interface EventDataType {
   right?: string;
   bottom?: string;
   left?: string;
+  top?: string;
   cart?: string;
   cart_sig?: string;
   assistantId?: number;
   endUserId?: string;
+  sessionId?: string;
   variantId?: number;
   quantity?: number;
   event?: string;
+  frameBorderRadius?: string;
+  marginBottom?: string;
+  marginTop?: string;
+  marginRight?: string;
   query?: string;
   searchQuery?: string;
+  handle?: string;
   hasProducts?: boolean;
   productCount?: number;
   success?: boolean;
   error?: string;
+  product?: {
+    id?: number;
+    title?: string;
+    handle?: string;
+    price?: number;
+  } | null;
 }
 
 export interface CustomCSSProperties {
   bottom?: string;
   right?: string;
+  left?: string;
+  top?: string;
 }

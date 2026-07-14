@@ -1,7 +1,10 @@
 import {
   ALPHABLOCKS_WRAPPER_ID,
-  CHATBOT_URL,
+  ASA_STOREFRONT_ACTION_ATTR,
+  ASA_STOREFRONT_MESSAGE_ATTR,
+  ASA_STOREFRONT_PILL_QUESTIONS_ATTR,
   ASSISTANT_DETAILS_STORAGE_KEY,
+  NUDGE_DEV_ENABLED,
 } from "./constants/index.ts";
 import { AlphaBlocksConstructor, EventDataType, CustomCSSProperties } from "./types/index.ts";
 import { getAssistantDetails, getEndUser, getSessionDetails } from "./utils/api.ts";
@@ -10,6 +13,10 @@ import {
   createWrapper,
   getChatIconHTML,
   getElement,
+  getOrCreateFrameWrapper,
+  hideFrameWrapperUntilReady,
+  revealFrameWrapper,
+  syncFrameWrapperSize,
   updateWrapperProperties,
 } from "./utils/dom.ts";
 import { setCustomOffsets } from "./utils/dom.ts";
@@ -17,23 +24,49 @@ import {
   handleAddProductToCart,
   handleCheckSearchProducts,
   handleGetCartDetails,
+  handleGetProductByHandle,
   handleSetCartAttributes,
 } from "./utils/event-handler.ts";
 import {
+  buildWidgetIframeSrc,
   createIFrame,
   hideIframe,
   sendOriginalWindowMessage,
   sendParentUrlParams,
   setIframeAccessibleTitle,
   setIframeSize,
+  sendStorefrontAction,
+  type StorefrontAction,
 } from "./utils/iframe.ts";
+import {
+  installHostScrollDepthReporter,
+  resetHostScrollDepthReporter,
+} from "./utils/host-scroll-depth.ts";
 import {
   installShopifyCartFetchBridge,
   onCartBridgeIframeMounted,
+  registerCartAttributeContext,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
+import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
+import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
+import {
+  parseStorefrontPillQuestions,
+  type StorefrontPillQuestion,
+} from "./utils/storefront-pill-questions.ts";
 
 installShopifyCartFetchBridge();
+
+let asaStorefrontButtonListenerInstalled = false;
+
+const ASA_STOREFRONT_BTN_SELECTOR = `[${ASA_STOREFRONT_ACTION_ATTR}]`;
+
+function parseStorefrontAction(value: string | null): StorefrontAction | null {
+  const action = (value || "").trim().toLowerCase();
+  if (action === "btn-open" || action === "btn-ask" || action === "btn-assistant-append")
+    return action;
+  return null;
+}
 
 export class AlphaBlocks {
   private token: string;
@@ -44,11 +77,21 @@ export class AlphaBlocks {
   private assistantColor: string = "";
   private assistantTextColor: string = "";
   private iframe: HTMLIFrameElement | null = null;
+  private hydratePromise: Promise<void> | null = null;
   public endUserId: string = "";
+  public sessionId: string = "";
   public userId: string = "";
+  public isActive: boolean = true;
+  private cartUpdateQueue: Promise<void> = Promise.resolve();
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
+    registerCartAttributeContext(() => ({
+      assistantId: this.assistantId,
+      endUserId: this.endUserId,
+      sessionId: this.sessionId,
+    }));
+    mountNudgeDevPanelIfLocal(() => this.iframe);
     this.token = props.token;
     this.assistantName = props.name || "";
     this.assistantAvatar = props.avatar || "";
@@ -62,6 +105,25 @@ export class AlphaBlocks {
     window.addEventListener("message", (event) => {
       this.handleEvents(event.data.type, event.data.data);
     });
+    window.addEventListener("popstate", () => this.syncParentUrlToWidget());
+  }
+
+  /** Push host URL + reset scroll depth to the widget (SPA / scroll QA harness). */
+  public syncParentUrlToWidget(): void {
+    if (!this.iframe) return;
+    resetHostScrollDepthReporter(() => this.iframe);
+    sendParentUrlParams(this.iframe, this.assistantId);
+  }
+
+  private ensureNudgeScrollQaHarness(): void {
+    if (!NUDGE_DEV_ENABLED) return;
+    installNudgeScrollQa({
+      getAssistant: () => this,
+      getNudgeDevPanel: () => document.getElementById(NUDGE_DEV_PANEL_ID),
+    });
+    if (/^\/products\//.test(location.pathname)) {
+      this.syncParentUrlToWidget();
+    }
   }
 
   private handleEvents(type: string, data: EventDataType): void {
@@ -100,9 +162,19 @@ export class AlphaBlocks {
       case "alphablocks-check-search-products":
         this.handleCartUpdates("alphablocks-check-search-products", data);
         break;
+      case "alphablocks-get-product-by-handle":
+        this.handleCartUpdates("alphablocks-get-product-by-handle", data);
+        break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
+        try {
+          const container = getElement(ALPHABLOCKS_WRAPPER_ID);
+          const frameWrapper = getOrCreateFrameWrapper(container);
+          revealFrameWrapper(frameWrapper);
+        } catch {
+          // container not mounted yet
+        }
         break;
     }
   }
@@ -196,35 +268,60 @@ export class AlphaBlocks {
   private async hydrateAssistantDetails(storageKey: string): Promise<void> {
     const data = await getAssistantDetails(this.token);
     if (data && data.data?.assistant_details) {
+      const details = data.data.assistant_details;
+      this.isActive = details.is_active ?? true;
+      if (!this.isActive) {
+        sessionStorage.removeItem(storageKey);
+        return;
+      }
       this.assistantName = data.data.name;
       this.assistantId = data.data.id;
-      sessionStorage.setItem(storageKey, JSON.stringify(data.data.assistant_details));
-      updateWrapperProperties(data.data.assistant_details);
+      sessionStorage.setItem(storageKey, JSON.stringify(details));
+      updateWrapperProperties(details);
       if (this.iframe) {
         setIframeAccessibleTitle(this.iframe, this.assistantName);
       }
     }
   }
 
-  private async handleCartUpdates(event: string, data: EventDataType): Promise<void> {
-    if (event === "alphablocks-set-cart-attributes") {
-      await handleSetCartAttributes(this.assistantId, this.endUserId);
+  private handleCartUpdates(event: string, data: EventDataType): void {
+    // Capture sessionId synchronously before queuing
+    if (
+      (event === "alphablocks-set-cart-attributes" ||
+        event === "alphablocks-add-product-to-cart") &&
+      data.sessionId
+    ) {
+      this.sessionId = data.sessionId;
     }
-    if (event === "alphablocks-add-product-to-cart") {
-      await handleAddProductToCart(
-        data.variantId,
-        data.quantity,
-        this.iframe,
-        this.assistantId,
-        this.endUserId,
-      );
-    }
-    if (event === "alphablocks-get-cart-details") {
-      await handleGetCartDetails(this.iframe);
-    }
-    if (event === "alphablocks-check-search-products") {
-      await handleCheckSearchProducts(data.query || "", this.iframe);
-    }
+    // Serialize all cart writes — prevents concurrent getCart/persist race
+    this.cartUpdateQueue = this.cartUpdateQueue
+      .then(async () => {
+        if (event === "alphablocks-set-cart-attributes") {
+          await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
+        }
+        if (event === "alphablocks-add-product-to-cart") {
+          await handleAddProductToCart(
+            data.variantId,
+            data.quantity,
+            this.iframe,
+            this.assistantId,
+            this.endUserId,
+            this.sessionId,
+          );
+        }
+        if (event === "alphablocks-get-cart-details") {
+          await handleGetCartDetails(this.iframe);
+        }
+        if (event === "alphablocks-check-search-products") {
+          await handleCheckSearchProducts(data.query || "", this.iframe);
+        }
+        if (event === "alphablocks-get-product-by-handle") {
+          await handleGetProductByHandle(data.handle || "", this.iframe);
+        }
+      })
+      .catch((err) => {
+        console.error("[ASA] cartUpdateQueue error:", err);
+      });
   }
 
   public renderPill(container: string | HTMLElement): void {
@@ -262,28 +359,40 @@ export class AlphaBlocks {
     }
   }
 
-  public showAssistant(): void {
+  public async showAssistant(): Promise<void> {
+    if (this.hydratePromise) await this.hydratePromise;
+    if (!this.isActive) return;
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     let iframe = element.querySelector("iframe");
 
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 1);
       element.style.zIndex = "2147480000";
-      element.appendChild(iframe);
+      const frameWrapper = getOrCreateFrameWrapper(element);
+      frameWrapper.appendChild(iframe);
+      syncFrameWrapperSize(frameWrapper, iframe);
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
+      installHostScrollDepthReporter(() => this.iframe);
+      this.ensureNudgeScrollQaHarness();
       return;
     }
 
-    iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(this.token)}&version=1&theme=${encodeURIComponent(this.assistantTheme || "")}`;
+    iframe.src = buildWidgetIframeSrc(this.token, 1, this.assistantTheme || "");
     setIframeAccessibleTitle(iframe, this.assistantName);
+    hideFrameWrapperUntilReady(getOrCreateFrameWrapper(element));
     iframe.style.display = "block";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
+    installHostScrollDepthReporter(() => this.iframe);
+    this.ensureNudgeScrollQaHarness();
   }
 
-  public async renderWrapper(): Promise<void> {
+  public renderWrapper(): void {
     createWrapper();
+    installAsaStorefrontButtonListener((action, message, pillQuestions) =>
+      this.runStorefrontAction(action, message, pillQuestions),
+    );
 
     const storageKey = `${ASSISTANT_DETAILS_STORAGE_KEY}-${this.token}`;
     const cachedAssistantDetails = sessionStorage.getItem(storageKey);
@@ -291,6 +400,15 @@ export class AlphaBlocks {
       try {
         const parsedAssistantDetails = JSON.parse(cachedAssistantDetails);
         if (parsedAssistantDetails) {
+          // If is_active is missing from cache (old cache), bust it and re-fetch.
+          if (!("is_active" in parsedAssistantDetails)) {
+            sessionStorage.removeItem(storageKey);
+            this.hydratePromise = this.hydrateAssistantDetails(storageKey);
+            return;
+          }
+          this.isActive = parsedAssistantDetails.is_active;
+          this.hydratePromise = Promise.resolve();
+          if (!this.isActive) return;
           this.assistantName = parsedAssistantDetails.name;
           this.assistantId = parsedAssistantDetails.id;
           updateWrapperProperties(parsedAssistantDetails);
@@ -303,11 +421,9 @@ export class AlphaBlocks {
         /* invalid JSON in sessionStorage */
       }
       sessionStorage.removeItem(storageKey);
-      void this.hydrateAssistantDetails(storageKey);
-      return;
     }
 
-    void this.hydrateAssistantDetails(storageKey);
+    this.hydratePromise = this.hydrateAssistantDetails(storageKey);
   }
 
   public addCustomCSS(props: CustomCSSProperties): void {
@@ -321,7 +437,9 @@ export class AlphaBlocks {
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
       element.style.zIndex = "2147480000";
-      element.appendChild(iframe);
+      const frameWrapper = getOrCreateFrameWrapper(element);
+      frameWrapper.appendChild(iframe);
+      syncFrameWrapperSize(frameWrapper, iframe);
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
     } else {
@@ -330,6 +448,9 @@ export class AlphaBlocks {
       this.iframe = iframe;
       onCartBridgeIframeMounted(iframe);
     }
+
+    installHostScrollDepthReporter(() => this.iframe);
+    this.ensureNudgeScrollQaHarness();
 
     if (this.assistantId && this.endUserId) {
       await getEndUser(this.assistantId, this.endUserId);
@@ -341,8 +462,80 @@ export class AlphaBlocks {
     iframe.style.display = "none";
     this.iframe = iframe;
     onCartBridgeIframeMounted(iframe);
+    installHostScrollDepthReporter(() => this.iframe);
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
     element.style.zIndex = "2147480000";
-    element.appendChild(iframe);
+    const frameWrapper = getOrCreateFrameWrapper(element);
+    frameWrapper.appendChild(iframe);
+    syncFrameWrapperSize(frameWrapper, iframe);
   }
+
+  private async resolveStorefrontIframe(): Promise<HTMLIFrameElement | null> {
+    if (this.hydratePromise) await this.hydratePromise;
+    if (!this.isActive) return null;
+
+    const iframe =
+      this.iframe ??
+      (getElement(ALPHABLOCKS_WRAPPER_ID).querySelector("iframe") as HTMLIFrameElement | null);
+    if (!iframe) return null;
+    this.iframe = iframe;
+    return iframe;
+  }
+
+  public async runStorefrontAction(
+    action: StorefrontAction,
+    message?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
+    const iframe = await this.resolveStorefrontIframe();
+    if (!iframe) return;
+    sendStorefrontAction(iframe, action, message, pillQuestions);
+  }
+
+  public async openChat(): Promise<void> {
+    await this.runStorefrontAction("btn-open");
+  }
+
+  public async openWithQuestion(question: string): Promise<void> {
+    const trimmed = (question || "").trim();
+    if (!trimmed) return;
+    await this.runStorefrontAction("btn-ask", trimmed);
+  }
+
+  public async openWithNudgeIntro(
+    introText?: string,
+    pillQuestions?: StorefrontPillQuestion[],
+  ): Promise<void> {
+    const trimmed = (introText || "").trim();
+    await this.runStorefrontAction("btn-assistant-append", trimmed || undefined, pillQuestions);
+  }
+}
+
+type RunStorefrontActionFn = AlphaBlocks["runStorefrontAction"];
+
+function installAsaStorefrontButtonListener(runStorefrontAction: RunStorefrontActionFn): void {
+  if (typeof document === "undefined" || asaStorefrontButtonListenerInstalled) return;
+  asaStorefrontButtonListenerInstalled = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const btn = target.closest(ASA_STOREFRONT_BTN_SELECTOR);
+    if (!btn) return;
+
+    const action = parseStorefrontAction(btn.getAttribute(ASA_STOREFRONT_ACTION_ATTR));
+    if (!action) return;
+
+    const message = (btn.getAttribute(ASA_STOREFRONT_MESSAGE_ATTR) || "").trim();
+    if (action === "btn-ask" && !message) return;
+
+    const pillQuestions =
+      action === "btn-assistant-append"
+        ? parseStorefrontPillQuestions(btn.getAttribute(ASA_STOREFRONT_PILL_QUESTIONS_ATTR))
+        : undefined;
+
+    event.preventDefault();
+    void runStorefrontAction(action, message || undefined, pillQuestions);
+  });
 }

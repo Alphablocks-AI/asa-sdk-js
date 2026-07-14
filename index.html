@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Asa — local nudge dev</title>
+    <base href="/" />
+    <style>
+      #alphablocks-local-dev-toolbar {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 2147483646;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 12px;
+      }
+      #alphablocks-local-dev-toolbar > * {
+        pointer-events: auto;
+      }
+      #alphablocks-local-dev-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .local-dev-chip {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 9999px;
+        padding: 6px 12px;
+        background: rgba(23, 23, 23, 0.95);
+        color: #fafafa;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #alphablocks-local-dev-panels {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      [data-asa-action] {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: aqua;
+        padding: 10px;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        z-index: 2;
+      }
+      [data-asa-action="btn-ask"] {
+        top: 56px;
+      }
+      [data-asa-action="btn-open"] {
+        top: 104px;
+      }
+      [data-asa-action="btn-assistant-append"] {
+        top: 152px;
+      }
+      [data-asa-action="btn-assistant-append"][data-asa-pill-questions] {
+        top: 200px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message]):not([data-asa-pill-questions]) {
+        top: 248px;
+      }
+      [data-asa-action="btn-assistant-append"]:not([data-asa-message])[data-asa-pill-questions] {
+        top: 296px;
+      }
+    </style>
+    <script>
+      (function () {
+        var key = "alphablocks-scroll-qa-path";
+        var params = new URLSearchParams(location.search);
+        var fromQuery = params.get("scroll-qa-path");
+        var stored = sessionStorage.getItem(key);
+        var target =
+          fromQuery && fromQuery.charAt(0) === "/" ? fromQuery : stored;
+        if (!target || target === "/") return;
+        var path = location.pathname || "/";
+        if (path !== "/" && path !== "/index.html") return;
+        sessionStorage.removeItem(key);
+        history.replaceState(null, "", target);
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- Host mount for Nudges Dev Controls (SDK build:nudge-dev only). See apps/widget/dev/nudges/README.md -->
+    <div id="alphablocks-local-dev-toolbar" aria-label="Local nudge dev">
+      <div id="alphablocks-local-dev-chip-row" class="local-dev-chip-row"></div>
+      <div id="alphablocks-local-dev-panels"></div>
+    </div>
+
+    <button
+      type="button"
+      data-asa-action="btn-ask"
+      data-asa-message="What are the ingredients of this product?"
+    >
+      Ask: ingredients
+    </button>
+
+    <button type="button" data-asa-action="btn-open">
+      Open chat only
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+    >
+      Nudge + default question pills
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-message="Happy to help you decide. Tap below or ask me anything."
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom question pills
+    </button>
+
+    <button type="button" data-asa-action="btn-assistant-append">
+      Nudge + default pills (no intro attr)
+    </button>
+
+    <button
+      type="button"
+      data-asa-action="btn-assistant-append"
+      data-asa-pill-questions='[
+        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+      ]'
+    >
+      Nudge + custom pills (no intro attr)
+    </button>
+
+    <script src="/dist-local/index.umd.js"></script>
+    <script>
+      const alphablocksAssistant = new AlphaBlocks({
+        token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",
+      });
+      alphablocksAssistant.renderWrapper();
+      alphablocksAssistant.showAssistant();
+    </script>
+  </body>
+</html>

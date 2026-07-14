@@ -1,71 +1,49 @@
 import {
   ALPHABLOCKS_WRAPPER_ID,
   CHATBOT_URL,
+  CHAT_IFRAME_VIEWPORT_HEIGHT,
+  CHAT_IFRAME_WIDTH_PX,
   EMBED_MOBILE_MAX_INNER_WIDTH_PX,
-  MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX,
 } from "../constants/index.ts";
 import { EventDataType } from "../types/index.ts";
 import { getCookie } from "./cookie.ts";
-import { getElement, getCurrentPosition, getCustomOffsets } from "./dom.ts";
-
-let mobileNudgeScrollCleanup: (() => void) | null = null;
-
-function teardownMobileNudgeScrollDismiss(): void {
-  if (mobileNudgeScrollCleanup) {
-    mobileNudgeScrollCleanup();
-    mobileNudgeScrollCleanup = null;
-  }
-}
-
-/**
- * Mobile floating nudge (`mobileNudgeView`): shopper scrolls the host page, not the iframe.
- * postMessage targetOrigin uses the iframe’s loaded URL so local dev works even if SDK_URL differs at build time.
- */
-function getIframePostMessageTarget(iframe: HTMLIFrameElement): string {
-  try {
-    return new URL(iframe.src).origin;
-  } catch {
-    return "*";
-  }
-}
-
-function syncMobileNudgeScrollDismiss(properties: EventDataType, iframe: HTMLIFrameElement): void {
-  teardownMobileNudgeScrollDismiss();
-
-  if (
-    properties.event !== "mobileNudgeView" ||
-    window.innerWidth > EMBED_MOBILE_MAX_INNER_WIDTH_PX
-  ) {
-    return;
-  }
-
-  const scrollRoot = document.scrollingElement ?? document.documentElement;
-  const initialY = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-  const targetOrigin = getIframePostMessageTarget(iframe);
-
-  const onScroll = (): void => {
-    const y = window.scrollY ?? scrollRoot.scrollTop ?? 0;
-    if (Math.abs(y - initialY) < MOBILE_NUDGE_SCROLL_DISMISS_MIN_DELTA_PX) return;
-    if (!iframe.contentWindow) return;
-    iframe.contentWindow.postMessage(
-      { type: "alphablocks-dismiss-nudge-on-scroll", data: {} },
-      targetOrigin,
-    );
-    teardownMobileNudgeScrollDismiss();
-  };
-
-  // Capture: nested scroll containers (overflow regions) still notify during capture phase.
-  window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-  document.addEventListener("scroll", onScroll, { passive: true, capture: true });
-  mobileNudgeScrollCleanup = () => {
-    window.removeEventListener("scroll", onScroll, { capture: true });
-    document.removeEventListener("scroll", onScroll, { capture: true });
-  };
-}
+import {
+  applyContainerCornerPosition,
+  applyContainerOffsetPosition,
+  applyFrameWrapperChrome,
+  getCurrentPosition,
+  getElement,
+  getOrCreateFrameWrapper,
+  revealFrameWrapper,
+  syncFrameWrapperSize,
+} from "./dom.ts";
+import { resetHostScrollDepthReporter } from "./host-scroll-depth.ts";
+import { getIframePostMessageTarget } from "./post-message-target.ts";
 
 export function setIframeAccessibleTitle(iframe: HTMLIFrameElement, assistantName: string): void {
   const label = (assistantName || "").trim();
   iframe.title = label ? `AlphaBlocks chat — ${label}` : "AlphaBlocks chat assistant";
+}
+
+function isLocalChatbotHost(): boolean {
+  try {
+    const host = new URL(CHATBOT_URL).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+export function buildWidgetIframeSrc(token: string, version: number, theme: string): string {
+  const params = new URLSearchParams({
+    token,
+    version: String(version),
+    theme: theme || "",
+  });
+  if (isLocalChatbotHost()) {
+    params.set("widgetNudgeDev", "1");
+  }
+  return `${CHATBOT_URL}/?${params.toString()}`;
 }
 
 export function createIFrame(
@@ -75,104 +53,159 @@ export function createIFrame(
   version: number,
 ): HTMLIFrameElement {
   const iframe = document.createElement("iframe");
-  // Ensure name is a string and has a default value
   const assistantName = name || "";
   const width =
     assistantName.length <= 7 ? "120px" : assistantName.length <= 15 ? "170px" : "235px";
-  iframe.src = `${CHATBOT_URL}/?token=${encodeURIComponent(token)}&version=${version}&theme=${encodeURIComponent(theme || "")}`;
-  iframe.style.width = version === 1 ? width : "562px";
-  iframe.style.height = version === 1 ? "60px" : "545px";
+  iframe.src = buildWidgetIframeSrc(token, version, theme);
+  iframe.style.width = version === 1 ? width : `${CHAT_IFRAME_WIDTH_PX}px`;
+  iframe.style.height = version === 1 ? "60px" : CHAT_IFRAME_VIEWPORT_HEIGHT;
   iframe.style.border = "none";
   iframe.style.background = "transparent";
+  iframe.style.display = "block";
+  iframe.style.transition = "none";
   iframe.allow = "microphone";
   setIframeAccessibleTitle(iframe, assistantName);
   return iframe;
 }
 
+const NUDGE_RESIZE_EVENTS = new Set(["productPageNudgeView", "mobileNudgeView", "nudgeView"]);
+
+function isFullBleedMobileLayout(properties: EventDataType): boolean {
+  return Boolean(properties.right) && Boolean(properties.left) && Boolean(properties.bottom);
+}
+
+/** Apply a CSS size; fall back to `vh` when `dvh` is rejected (older engines / jsdom). */
+function setElementStyleDimension(
+  el: HTMLElement,
+  dimension: "width" | "height",
+  value: string,
+): void {
+  el.style.setProperty(dimension, value);
+  const applied = el.style.getPropertyValue(dimension);
+  if (applied === value) return;
+
+  if (value.endsWith("dvh")) {
+    const vhFallback = value.replace(/dvh$/, "vh");
+    if (applied !== vhFallback) {
+      el.style.setProperty(dimension, vhFallback);
+    }
+    return;
+  }
+  if (value.endsWith("dvw")) {
+    const vwFallback = value.replace(/dvw$/, "vw");
+    if (applied !== vwFallback) {
+      el.style.setProperty(dimension, vwFallback);
+    }
+  }
+}
+
+function shouldRevealHostFrame(properties: EventDataType): boolean {
+  const event = properties.event ?? "";
+  const hasExplicitPxSize =
+    Boolean(properties.width?.endsWith("px")) && Boolean(properties.height?.endsWith("px"));
+  if (NUDGE_RESIZE_EVENTS.has(event) && hasExplicitPxSize) return true;
+  if (NUDGE_RESIZE_EVENTS.has(event)) return false;
+  if (event === "mobileView" || isFullBleedMobileLayout(properties)) return true;
+  return Boolean(properties.frameBorderRadius);
+}
+
 export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameElement | null): void {
-  if (!iframe || !properties.height || !properties.width) return;
+  if (!iframe) return;
 
-  const wrapperDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
-  iframe.style.width = properties.width;
+  const containerDiv = getElement(ALPHABLOCKS_WRAPPER_ID);
+  const frameWrapper = getOrCreateFrameWrapper(containerDiv);
 
-  wrapperDiv.style.width = "fit-content";
-  wrapperDiv.style.height = "fit-content";
+  if (properties.frameBorderRadius) {
+    frameWrapper.style.borderRadius = properties.frameBorderRadius;
+  }
 
-  // Get the current position to respect positioning set by updateWrapperProperties
+  if (!properties.height || !properties.width) {
+    if (shouldRevealHostFrame(properties)) {
+      revealFrameWrapper(frameWrapper);
+    }
+    return;
+  }
+
+  setElementStyleDimension(iframe, "width", properties.width);
+
+  const eventName = properties.event ?? "";
+  const hasExplicitPxSize = properties.width.endsWith("px") && properties.height.endsWith("px");
+  const isMobileNudgeEvent = eventName === "mobileNudgeView";
+  const skipFitContentReset =
+    NUDGE_RESIZE_EVENTS.has(eventName) && (hasExplicitPxSize || isMobileNudgeEvent);
+
+  if (!skipFitContentReset) {
+    containerDiv.style.width = "fit-content";
+    containerDiv.style.height = "fit-content";
+    frameWrapper.style.width = "fit-content";
+    frameWrapper.style.height = "fit-content";
+  }
+
   const currentPosition = getCurrentPosition();
-  const custom = getCustomOffsets();
+  const isMobileViewport = window.innerWidth <= EMBED_MOBILE_MAX_INNER_WIDTH_PX;
+  const isNudgeFrame = NUDGE_RESIZE_EVENTS.has(eventName);
+  const isFullBleedMobile = isFullBleedMobileLayout(properties);
 
-  if (properties.event === "mobileNudgeView") {
-    wrapperDiv.style.left = "16px";
-    iframe.style.width = "100%";
-  } else {
-    // Only remove left property if we're not in bottom-left or bottom-center position
-    if (currentPosition !== "bottom-left" && currentPosition !== "bottom-center") {
-      wrapperDiv.style.removeProperty("left");
-    }
-  }
-
-  if (window.innerWidth <= 500) {
-    // For mobile, respect the current position but adjust spacing
-    if (currentPosition === "bottom-left") {
-      wrapperDiv.style.left = "16px";
-      wrapperDiv.style.right = "";
-    } else if (currentPosition === "bottom-center") {
-      wrapperDiv.style.left = "50%";
-      wrapperDiv.style.transform = "translateX(-50%)";
-      wrapperDiv.style.right = "";
+  if (isFullBleedMobile) {
+    containerDiv.style.bottom = properties.bottom!;
+    containerDiv.style.left = properties.left!;
+    containerDiv.style.right = properties.right!;
+    containerDiv.style.top = "0";
+    containerDiv.style.transform = "";
+    containerDiv.style.margin = "";
+    containerDiv.style.width = "100%";
+    containerDiv.style.height = "100%";
+    setElementStyleDimension(iframe, "width", properties.width);
+    setElementStyleDimension(iframe, "height", properties.height);
+    frameWrapper.style.width = "100%";
+    frameWrapper.style.height = "100%";
+  } else if (isNudgeFrame) {
+    if (isMobileNudgeEvent) {
+      containerDiv.style.left = "0";
+      containerDiv.style.right = "0";
+      containerDiv.style.bottom = "0";
+      containerDiv.style.top = "";
+      containerDiv.style.transform = "";
+      containerDiv.style.margin = "";
+      containerDiv.style.width = "100%";
+      containerDiv.style.height = properties.height;
+      frameWrapper.style.width = "100%";
+      frameWrapper.style.height = properties.height;
+      setElementStyleDimension(iframe, "width", "100%");
+      setElementStyleDimension(iframe, "height", properties.height);
     } else {
-      wrapperDiv.style.right = custom.right || "16px";
-      wrapperDiv.style.left = "";
-      wrapperDiv.style.transform = "";
+      applyContainerCornerPosition(containerDiv, currentPosition);
+      setElementStyleDimension(iframe, "height", properties.height);
+      frameWrapper.style.width = properties.width;
+      frameWrapper.style.height = properties.height;
+      syncFrameWrapperSize(frameWrapper, iframe);
     }
-    wrapperDiv.style.bottom = custom.bottom || "16px";
-    // If event provides explicit overrides, apply them (each independently)
-    if (
-      properties.right &&
-      currentPosition !== "bottom-left" &&
-      currentPosition !== "bottom-center"
-    )
-      wrapperDiv.style.right = properties.right;
-    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
-    wrapperDiv.style.width = properties.width;
-    iframe.style.height = properties.height;
   } else {
-    // For desktop, respect the current position
-    if (currentPosition === "bottom-left") {
-      wrapperDiv.style.left = "24px";
-      wrapperDiv.style.right = "";
-      wrapperDiv.style.transform = "";
-    } else if (currentPosition === "bottom-center") {
-      wrapperDiv.style.left = "50%";
-      wrapperDiv.style.transform = "translateX(-50%)";
-      wrapperDiv.style.right = "";
-    } else {
-      wrapperDiv.style.right = custom.right || "24px";
-      wrapperDiv.style.left = "";
-      wrapperDiv.style.transform = "";
-    }
-    wrapperDiv.style.bottom = custom.bottom || "24px";
-    // Allow event to override custom/default individually
-    if (
-      properties.right &&
-      currentPosition !== "bottom-left" &&
-      currentPosition !== "bottom-center"
-    )
-      wrapperDiv.style.right = properties.right;
-    if (properties.bottom) wrapperDiv.style.bottom = properties.bottom;
-    iframe.style.height = properties.height;
+    const hasTopOffset = Boolean(properties.marginTop ?? properties.top);
+    applyContainerOffsetPosition(containerDiv, currentPosition, {
+      isMobile: isMobileViewport,
+      top: hasTopOffset ? (properties.marginTop ?? properties.top) : "",
+      bottom: properties.marginBottom ?? properties.bottom,
+      right: properties.marginRight ?? properties.right,
+    });
+    setElementStyleDimension(iframe, "height", properties.height);
+    frameWrapper.style.width = properties.width;
+    frameWrapper.style.height = properties.height;
+    syncFrameWrapperSize(frameWrapper, iframe);
   }
 
-  if (properties.right && properties.left && properties.bottom) {
-    wrapperDiv.style.right = properties.right;
-    wrapperDiv.style.bottom = properties.bottom;
-    wrapperDiv.style.left = properties.left;
-    wrapperDiv.style.width = "100%";
-    wrapperDiv.style.height = "100%";
+  if (properties.frameBorderRadius) {
+    frameWrapper.style.borderRadius = properties.frameBorderRadius;
   }
 
-  syncMobileNudgeScrollDismiss(properties, iframe);
+  applyFrameWrapperChrome(frameWrapper, iframe, containerDiv, {
+    isNudge: isNudgeFrame,
+  });
+
+  if (shouldRevealHostFrame(properties)) {
+    revealFrameWrapper(frameWrapper);
+    iframe.style.display = "block";
+  }
 }
 
 export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): void {
@@ -181,11 +214,10 @@ export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): voi
     data: { width: window.innerWidth, height: window.innerHeight },
   };
   if (!iframe || !iframe.contentWindow) return;
-  iframe.contentWindow.postMessage(message, CHATBOT_URL);
+  iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
 }
 
 export function hideIframe(iframe: HTMLIFrameElement | null): void {
-  teardownMobileNudgeScrollDismiss();
   if (!iframe) return;
   iframe.style.display = "none";
   const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
@@ -210,8 +242,59 @@ export function sendParentUrlParams(
   window.history.replaceState({}, document.title, url.toString());
   const message = {
     type: "alphablocks-parent-url",
-    data: { ask_asa: askAsa, query, searchQuery, urlPath, params, sessionCookie },
+    data: {
+      ask_asa: askAsa,
+      query,
+      searchQuery,
+      urlPath,
+      params,
+      sessionCookie,
+      hostname: window.location.hostname,
+    },
   };
   if (!iframe || !iframe.contentWindow) return;
-  iframe.contentWindow.postMessage(message, CHATBOT_URL);
+  iframe.contentWindow.postMessage(message, getIframePostMessageTarget(iframe));
+  resetHostScrollDepthReporter(() => iframe);
+}
+
+export type StorefrontAction = "btn-open" | "btn-ask" | "btn-assistant-append";
+
+function buildStorefrontParentMessageData(): {
+  urlPath: string;
+  searchQuery: string;
+  hostname: string;
+} {
+  const url = new URL(window.location.href);
+  return {
+    urlPath: `${url.pathname}${url.search}`,
+    searchQuery: url.searchParams.get("q") || "",
+    hostname: window.location.hostname,
+  };
+}
+
+function postStorefrontMessageToIframe(
+  iframe: HTMLIFrameElement | null,
+  type: string,
+  data: Record<string, unknown>,
+): void {
+  if (!iframe?.contentWindow) return;
+  iframe.contentWindow.postMessage({ type, data }, getIframePostMessageTarget(iframe));
+  resetHostScrollDepthReporter(() => iframe);
+}
+
+export function sendStorefrontAction(
+  iframe: HTMLIFrameElement | null,
+  action: StorefrontAction,
+  message?: string,
+  pillQuestions?: Array<{ label: string; userMessage: string }>,
+): void {
+  const trimmedMessage = (message || "").trim();
+  if (action === "btn-ask" && !trimmedMessage) return;
+
+  postStorefrontMessageToIframe(iframe, "alphablocks-storefront-action", {
+    action,
+    ...(trimmedMessage ? { message: trimmedMessage } : {}),
+    ...(pillQuestions?.length ? { pillQuestions } : {}),
+    ...buildStorefrontParentMessageData(),
+  });
 }

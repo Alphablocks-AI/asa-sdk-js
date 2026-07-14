@@ -1,4 +1,13 @@
 import { CART_AJAX_EVENT, type CartAjaxEventName } from "./cart-ajax-constants.ts";
+import { handleStorefrontCartLineAdded } from "./event-handler.ts";
+
+export type CartAttributeBridgeContext = {
+  assistantId: number | null;
+  endUserId: string;
+  sessionId: string;
+};
+
+const ASA_CART_LINE_SOURCE = "asa.alphablocks.ai";
 
 /** Avoid `RequestInfo` / `RequestInit` in annotations — ESLint `no-undef` does not treat DOM lib types as defined. */
 type FetchInput = Parameters<typeof globalThis.fetch>[0];
@@ -13,10 +22,44 @@ let patched = false;
 let innerFetch: typeof fetch;
 
 let resolveIframe: () => HTMLIFrameElement | null = () => null;
+let resolveCartAttributeContext: () => CartAttributeBridgeContext | null = () => null;
 
 /** Update whenever `AlphaBlocks` assigns `this.iframe` (latest embed wins if multiple). */
 export function registerCartBridgeIframe(getIframe: () => HTMLIFrameElement | null): void {
   resolveIframe = getIframe;
+}
+
+/** Supplies assistant/end-user/session for storefront cart attribute sync. */
+export function registerCartAttributeContext(
+  getContext: () => CartAttributeBridgeContext | null,
+): void {
+  resolveCartAttributeContext = getContext;
+}
+
+function isSdkOriginatedLine(line: UnknownRecord): boolean {
+  const props = line.properties;
+  if (!isRecord(props)) return false;
+  return props.source === ASA_CART_LINE_SOURCE;
+}
+
+async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
+  const storefrontLines = lines.filter((line) => !isSdkOriginatedLine(line));
+  if (storefrontLines.length === 0) return;
+
+  const ctx = resolveCartAttributeContext();
+  if (!ctx?.assistantId || !ctx.endUserId) return;
+
+  await handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId || undefined);
+}
+
+function addedLinesFromCartDiff(
+  cartBeforeAdd: UnknownRecord | null,
+  fullCart: UnknownRecord,
+): UnknownRecord[] {
+  const prevKeys = new Set(
+    (cartBeforeAdd?.items as UnknownRecord[] | undefined)?.map(lineKey) ?? [],
+  );
+  return ((fullCart.items as UnknownRecord[]) ?? []).filter((line) => !prevKeys.has(lineKey(line)));
 }
 
 function getChatbotTargetOrigin(iframe: HTMLIFrameElement): string {
@@ -309,6 +352,11 @@ async function tryNotifyCartChangeFromSectionPayload(parsed: UnknownRecord): Pro
   for (const line of added) {
     postCartLineToWidget({ ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_ADDED), cart });
   }
+  if (added.length > 0) {
+    void syncStorefrontCartAttributesForAddedLines(added).catch(() => {
+      /* storefront fetch must not break */
+    });
+  }
 
   if (removed.length === 1) {
     postCartLineToWidget({
@@ -370,6 +418,35 @@ async function onFetchSettled(
     cartSnapshotCache = fullCart;
     const body = buildAddedEventPayload(parsed, fullCart, before);
     postCartLineToWidget(body);
+
+    // Derive added lines from response directly, not just from diff
+    const addedLines = addedLinesFromCartDiff(before, fullCart);
+
+    const linesForAttrs: UnknownRecord[] = (() => {
+      // 1. Diff found new lines — most reliable
+      if (addedLines.length > 0) return addedLines;
+
+      // 2. Response is a single line item directly
+      if (isRecord(parsed) && parsed.product_id != null && !isFullCartJson(parsed)) {
+        return [parsed as UnknownRecord];
+      }
+
+      // 3. Response is { items: [...] } wrapper (not full cart)
+      if (isRecord(parsed) && Array.isArray(parsed.items) && !isFullCartJson(parsed)) {
+        return (parsed.items as unknown[]).filter(isRecord);
+      }
+
+      // 4. Last resort — use buildAddedEventPayload's identified line from full cart
+      // Extract which line was identified as "added" from the event payload
+      const eventLine = (fullCart.items as UnknownRecord[])?.find(
+        (line) => lineKey(line) === lineKey(body as UnknownRecord),
+      );
+      return eventLine ? [eventLine] : [];
+    })();
+
+    if (linesForAttrs.length > 0) {
+      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch(() => {});
+    }
     return;
   }
 
@@ -384,6 +461,17 @@ async function onFetchSettled(
     const removed = findRemovedLines(prevItems, nextItems);
     const decremented = findQuantityDecrementedLines(prevItems, nextItems);
     cartSnapshotCache = newCart;
+
+    // Re-write ASA attrs if theme update wiped them
+    const attrs = (newCart.attributes as Record<string, string>) ?? {};
+    if (!attrs["asa.alphablocks.ai_session_id"]) {
+      const ctx = resolveCartAttributeContext();
+      if (ctx?.assistantId && ctx.endUserId && ctx.sessionId) {
+        void handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId).catch(
+          () => {},
+        );
+      }
+    }
 
     const linesToNotify = [...removed, ...decremented];
     if (linesToNotify.length === 0) return;

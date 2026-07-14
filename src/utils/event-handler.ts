@@ -1,8 +1,17 @@
-import { addToCart, getCart, getSearchProductsCount, updateCartAttributes } from "./api.ts";
+import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
+import {
+  buildAsaCartAttributes,
+  CART_ATTR_KEYS,
+  persistCartAttributes,
+  resolveEffectiveSessionId,
+  shouldSyncCartAttributes,
+  syncCartAttributes,
+} from "./cart-attributes.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
 const ADD_PRODUCT_TO_CART_RESPONSE = "alphablocks-add-product-to-cart-response";
 const SEARCH_PRODUCTS_RESPONSE = "alphablocks-check-search-products-response";
+const PRODUCT_BY_HANDLE_RESPONSE = "alphablocks-get-product-by-handle-response";
 
 // 🔹 0. Refresh cart UI
 export async function refreshCartUI(): Promise<void> {
@@ -38,6 +47,7 @@ export async function refreshCartUI(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           updates: { [key]: cart.items[0].quantity },
+          attributes: cart.attributes ?? {}, // ← ADD THIS
         }),
       });
     }
@@ -82,48 +92,13 @@ export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
 export async function handleSetCartAttributes(
   assistantId: number | null,
   endUserId: string,
+  sessionId?: string,
 ): Promise<void> {
-  if (!assistantId || !endUserId) return;
-
-  try {
-    // 1️⃣ Get initial cart
-    let cart = await getCart();
-
-    // 2️⃣ Build new attributes
-    const newAttrs = {
-      "asa.alphablocks.ai_assistant_id": assistantId.toString(),
-      "asa.alphablocks.ai_end_user_id": endUserId,
-    };
-    const mergedAttrs = { ...(cart.attributes || {}), ...newAttrs };
-
-    // 4️⃣ Ensure cart exists before setting attributes
-    const payload =
-      cart.item_count === 0
-        ? { note: "init_cart", attributes: mergedAttrs }
-        : { attributes: mergedAttrs };
-
-    // 5️⃣ First attempt
-    await updateCartAttributes(payload);
-
-    // 6️⃣ Validate
-    cart = await getCart();
-    const updatedAttrs = cart.attributes || {};
-
-    let needsRetry = false;
-    for (const k of Object.keys(newAttrs)) {
-      if (updatedAttrs[k as keyof typeof updatedAttrs] !== newAttrs[k as keyof typeof newAttrs]) {
-        needsRetry = true;
-        break;
-      }
-    }
-
-    // 7️⃣ Retry ONCE only
-    if (needsRetry) {
-      await updateCartAttributes(payload);
-    }
-  } catch (err) {
-    console.error("handleSetCartAttributes error:", err);
-  }
+  await syncCartAttributes({
+    assistantId,
+    endUserId,
+    sessionId,
+  });
 }
 
 // 🔹 3. Add product to cart (returns updated cart in message)
@@ -133,58 +108,41 @@ export async function handleAddProductToCart(
   iframe: HTMLIFrameElement | null,
   assistantId: number | null,
   endUserId: string,
+  sessionId?: string,
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
   try {
-    // 1) Add item to cart
     await addToCart(variantId, quantity);
 
-    // 2) Read the cart (source of truth)
     const cart = await getCart();
-    // 3) Get existing line items
-    const existingLineItems = cart.attributes?.["asa.alphablocks.ai_line_items"] || "";
+    const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
 
-    // 4) Prepare attributes merging existing attributes on cart
-    const existingAttrs = cart.attributes || {};
-    const updatedAttrs: Record<string, string> = {
-      ...existingAttrs,
-      "asa.alphablocks.ai_line_items": existingLineItems
-        ? `${existingLineItems}, ${variantId}`
-        : `${variantId}`,
+    // Race-condition guard: if widget didn't send sessionId yet, read from cart
+    const resolvedSessionId =
+      (sessionId ?? "").trim() || (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
+
+    const attrCtx = {
+      assistantId,
+      endUserId,
+      sessionId: resolvedSessionId,
+      variantIdsToAppend: [variantId],
     };
 
-    // 4.1) Ensure assistant/end-user attributes exist:
-    //      - If they already exist on the cart, leave them as-is
-    //      - If missing AND we have values, add them
-    if (assistantId && endUserId) {
-      if (!updatedAttrs["asa.alphablocks.ai_assistant_id"]) {
-        updatedAttrs["asa.alphablocks.ai_assistant_id"] = assistantId.toString();
-      }
-      if (!updatedAttrs["asa.alphablocks.ai_end_user_id"]) {
-        updatedAttrs["asa.alphablocks.ai_end_user_id"] = endUserId;
-      }
+    if (shouldSyncCartAttributes(attrCtx, existingAttrs)) {
+      const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
+      const updatedAttrs = buildAsaCartAttributes(existingAttrs, {
+        ...attrCtx,
+        sessionId: effectiveSessionId,
+      });
+      await persistCartAttributes(cart.item_count ?? 0, updatedAttrs);
     }
 
-    // 5) Persist attributes using the correct payload shape
-    //    updateCartAttributes expects { attributes: Record<string,string>, note?: string }
-    await updateCartAttributes({ attributes: updatedAttrs });
-
-    // 6) Refresh storefront cart UI silently (theme-agnostic)
     await refreshCartUI();
 
-    // 7) Fetch final cart state (after attributes + UI refresh)
     const finalCart = await getCart();
-
-    // 8) Post success response back to iframe
     iframe.contentWindow.postMessage(
-      {
-        type: ADD_PRODUCT_TO_CART_RESPONSE,
-        data: {
-          success: true,
-          cart: { ...finalCart, attributes: updatedAttrs },
-        },
-      },
+      { type: ADD_PRODUCT_TO_CART_RESPONSE, data: { success: true, cart: finalCart } },
       "*",
     );
   } catch (err) {
@@ -197,6 +155,19 @@ export async function handleAddProductToCart(
       "*",
     );
   }
+}
+
+/** Storefront `/cart/add.js` — sync session attrs only (no line items). */
+export async function handleStorefrontCartLineAdded(
+  assistantId: number | null,
+  endUserId: string,
+  sessionId: string | undefined,
+): Promise<void> {
+  await syncCartAttributes({
+    assistantId,
+    endUserId,
+    sessionId,
+  });
 }
 
 export async function handleCheckSearchProducts(
@@ -228,6 +199,49 @@ export async function handleCheckSearchProducts(
           query,
           hasProducts: false,
           productCount: 0,
+          error: (err as Error).message || String(err),
+        },
+      },
+      "*",
+    );
+  }
+}
+
+export async function handleGetProductByHandle(
+  handle: string,
+  iframe: HTMLIFrameElement | null,
+): Promise<void> {
+  if (!iframe?.contentWindow) return;
+
+  const normalizedHandle = handle.trim();
+  try {
+    const product = await getProductByHandle(normalizedHandle);
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_BY_HANDLE_RESPONSE,
+        data: {
+          success: Boolean(product),
+          handle: normalizedHandle,
+          product: product
+            ? {
+                id: product.id,
+                title: product.title,
+                handle: product.handle ?? normalizedHandle,
+                price: product.price,
+              }
+            : null,
+        },
+      },
+      "*",
+    );
+  } catch (err) {
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_BY_HANDLE_RESPONSE,
+        data: {
+          success: false,
+          handle: normalizedHandle,
+          product: null,
           error: (err as Error).message || String(err),
         },
       },
