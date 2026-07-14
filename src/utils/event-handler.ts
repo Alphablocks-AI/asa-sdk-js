@@ -1,4 +1,4 @@
-import { addToCart, getCart, getSearchProductsCount } from "./api.ts";
+import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
 import {
   buildAsaCartAttributes,
   CART_ATTR_KEYS,
@@ -11,6 +11,7 @@ import {
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
 const ADD_PRODUCT_TO_CART_RESPONSE = "alphablocks-add-product-to-cart-response";
 const SEARCH_PRODUCTS_RESPONSE = "alphablocks-check-search-products-response";
+const PRODUCT_BY_HANDLE_RESPONSE = "alphablocks-get-product-by-handle-response";
 
 // 🔹 0. Refresh cart UI
 export async function refreshCartUI(): Promise<void> {
@@ -198,6 +199,49 @@ export async function handleCheckSearchProducts(
           query,
           hasProducts: false,
           productCount: 0,
+          error: (err as Error).message || String(err),
+        },
+      },
+      "*",
+    );
+  }
+}
+
+export async function handleGetProductByHandle(
+  handle: string,
+  iframe: HTMLIFrameElement | null,
+): Promise<void> {
+  if (!iframe?.contentWindow) return;
+
+  const normalizedHandle = handle.trim();
+  try {
+    const product = await getProductByHandle(normalizedHandle);
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_BY_HANDLE_RESPONSE,
+        data: {
+          success: Boolean(product),
+          handle: normalizedHandle,
+          product: product
+            ? {
+                id: product.id,
+                title: product.title,
+                handle: product.handle ?? normalizedHandle,
+                price: product.price,
+              }
+            : null,
+        },
+      },
+      "*",
+    );
+  } catch (err) {
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_BY_HANDLE_RESPONSE,
+        data: {
+          success: false,
+          handle: normalizedHandle,
+          product: null,
           error: (err as Error).message || String(err),
         },
       },

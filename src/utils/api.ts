@@ -128,3 +128,19 @@ export async function getSearchProductsCount(query: string): Promise<{
   const productCount = Array.isArray(products) ? products.length : 0;
   return { hasProducts: productCount > 0, productCount };
 }
+
+export async function getProductByHandle(handle: string): Promise<{
+  id?: number;
+  title?: string;
+  handle?: string;
+  price?: number;
+} | null> {
+  const normalized = handle.trim();
+  if (!normalized) return null;
+
+  const res = await fetch(`/products/${encodeURIComponent(normalized)}.js`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
