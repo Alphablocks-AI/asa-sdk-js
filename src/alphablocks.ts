@@ -48,7 +48,11 @@ import {
   registerCartAttributeContext,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
-import { mountNudgeDevPanelIfLocal, NUDGE_DEV_PANEL_ID } from "./utils/nudge-dev-panel.ts";
+import {
+  isLocalNudgeDevHostPage,
+  mountNudgeDevPanelIfLocal,
+  NUDGE_DEV_PANEL_ID,
+} from "./utils/nudge-dev-panel.ts";
 import { installNudgeScrollQa } from "./utils/nudge-scroll-qa.ts";
 import {
   parseStorefrontPillQuestions,
@@ -116,10 +120,11 @@ export class AlphaBlocks {
   }
 
   private ensureNudgeScrollQaHarness(): void {
-    if (!NUDGE_DEV_ENABLED) return;
+    if (!NUDGE_DEV_ENABLED || !isLocalNudgeDevHostPage()) return;
     installNudgeScrollQa({
       getAssistant: () => this,
       getNudgeDevPanel: () => document.getElementById(NUDGE_DEV_PANEL_ID),
+      enabled: true,
     });
     if (/^\/products\//.test(location.pathname)) {
       this.syncParentUrlToWidget();

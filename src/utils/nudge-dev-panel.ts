@@ -46,6 +46,8 @@ const FIXTURE_OPTIONS = [
 ] as const;
 
 export const NUDGE_DEV_PANEL_ID = "alphablocks-nudge-dev-panel";
+/** Present only on asa-sdk-js/index.html — not on merchant/dashboard hosts. */
+export const LOCAL_NUDGE_DEV_HOST_ID = "alphablocks-local-dev-toolbar";
 const PANEL_ID = NUDGE_DEV_PANEL_ID;
 type NudgeDevFixtureId = (typeof FIXTURE_OPTIONS)[number]["id"];
 
@@ -56,6 +58,14 @@ export function isLocalWidgetTarget(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Nudge scroll-QA + Dev Controls are for the SDK local test page only.
+ * Local embeds on other hosts (e.g. dashboard playground) must get the widget alone.
+ */
+export function isLocalNudgeDevHostPage(): boolean {
+  return Boolean(document.getElementById(LOCAL_NUDGE_DEV_HOST_ID));
 }
 
 function postToWidget(
@@ -85,10 +95,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 /**
- * Host-page nudge dev panel (outside the widget iframe). Only mounts for local SDK builds.
+ * Host-page nudge dev panel (outside the widget iframe).
+ * Local SDK builds only, and only on asa-sdk-js/index.html (has #alphablocks-local-dev-toolbar).
  */
 export function mountNudgeDevPanelIfLocal(getIframe: () => HTMLIFrameElement | null): void {
-  if (!NUDGE_DEV_ENABLED || document.getElementById(PANEL_ID)) return;
+  if (!NUDGE_DEV_ENABLED || !isLocalNudgeDevHostPage() || document.getElementById(PANEL_ID)) {
+    return;
+  }
 
   let open = false;
   let fixtureId: NudgeDevFixtureId = FIXTURE_OPTIONS[0].id;
