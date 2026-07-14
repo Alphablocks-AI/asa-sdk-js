@@ -6,6 +6,14 @@
   "main": "dist/index.cjs.js",
   "type": "module",
   "types": "dist/types/index.d.ts",
+  "files": [
+    "dist",
+    "dist-dev",
+    "embed.js",
+    "embed-dev.js",
+    "LICENSE",
+    "README.md"
+  ],
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "eslint --fix",
