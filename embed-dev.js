@@ -2,8 +2,8 @@
  * AlphaBlocks Widget Integration Script — staging / local development loader
  * Works in React, Next.js, and vanilla HTML
  *
- * Lifecycle: same as embed.js — one guarded init per document; a full page refresh runs init again.
- * One store / site typically uses one widget (one public token).
+ * Lifecycle: same as embed.js — idempotent init (skip if iframe already mounted; allow re-init
+ * after host removes the widget DOM). One store / site typically uses one widget (one public token).
  *
  * Prefer placing before </body> with defer for minimal HTML parser blocking:
  *   <script defer src="https://unpkg.com/asa-sdk@latest/embed-dev.js" data-token="pk_..."></script>
@@ -30,6 +30,7 @@
 
   /** Only AlphaBlocks loader URLs (avoids matching unrelated scripts with "embed" in the path). */
   const LOADER_SCRIPT_SELECTOR = 'script[src*="embed-dev.js"], script[src*="embed.js"]';
+  const WRAPPER_ID = "alphablocks-assistant-container";
 
   function sdkUrlFromEmbedDevSrc(src) {
     if (!src || !/\/embed-dev\.js(\?|#|$)/i.test(src)) return null;
@@ -80,8 +81,18 @@
     defaultSdkUrlFromLoaderScripts() ||
     "https://unpkg.com/asa-sdk@latest/dist-dev/index.umd.js";
 
-  /** Ensures one init per document; cleared automatically on full page navigation / refresh. */
-  const EMBED_GUARD_KEY = "__ALPHABLOCKS_EMBED_INITIALIZED__";
+  /** True when the chat iframe is already in the DOM (live widget). */
+  function isWidgetMounted() {
+    try {
+      const container = document.getElementById(WRAPPER_ID);
+      return Boolean(container && container.querySelector("iframe"));
+    } catch {
+      return false;
+    }
+  }
+
+  /** Prevents overlapping inits from duplicate tags before the iframe exists. */
+  let embedStartInFlight = false;
 
   function normalizeToken(rawToken) {
     if (typeof rawToken !== "string") return null;
@@ -168,6 +179,8 @@
       return;
     }
 
+    if (isWidgetMounted()) return;
+
     try {
       const props = { token: token };
       if (userId) props.userId = userId;
@@ -180,32 +193,44 @@
   }
 
   function loadSDK(token, userId) {
+    const runInit = () =>
+      initWidget(token, userId)
+        .catch((error) => {
+          console.error("AlphaBlocks: Failed to initialize widget", error);
+        })
+        .finally(() => {
+          embedStartInFlight = false;
+        });
+
     if (window.AlphaBlocks) {
-      initWidget(token, userId).catch((error) => {
-        console.error("AlphaBlocks: Failed to initialize widget", error);
-      });
+      runInit();
       return;
     }
 
     const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
     if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        initWidget(token, userId).catch((error) => {
-          console.error("AlphaBlocks: Failed to initialize widget", error);
-        });
-      });
+      if (window.AlphaBlocks) {
+        runInit();
+        return;
+      }
+      existingScript.addEventListener("load", runInit);
+      existingScript.addEventListener(
+        "error",
+        () => {
+          embedStartInFlight = false;
+          console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
+        },
+        { once: true },
+      );
       return;
     }
 
     const script = document.createElement("script");
     script.src = SDK_URL;
     script.async = true;
-    script.onload = () => {
-      initWidget(token, userId).catch((error) => {
-        console.error("AlphaBlocks: Failed to initialize widget", error);
-      });
-    };
+    script.onload = runInit;
     script.onerror = () => {
+      embedStartInFlight = false;
       console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
     };
 
@@ -225,7 +250,7 @@
 
   function init() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
-    if (window[EMBED_GUARD_KEY]) return;
+    if (isWidgetMounted() || embedStartInFlight) return;
 
     const token = getToken();
     const userId = getUserId();
@@ -236,7 +261,8 @@
       );
       return;
     }
-    window[EMBED_GUARD_KEY] = true;
+
+    embedStartInFlight = true;
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => scheduleLoadSDK(token, userId));
