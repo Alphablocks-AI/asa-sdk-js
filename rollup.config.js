@@ -44,7 +44,7 @@ const config = {
       "process.env.API_URL": JSON.stringify(API_URL),
     }),
     typescript(),
-    ...(isDev
+    ...(isLocalBuild
       ? []
       : [
           terser({
