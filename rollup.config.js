@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 import typescript from "@rollup/plugin-typescript";
+import terser from "@rollup/plugin-terser";
 import copy from "rollup-plugin-copy";
 import replace from "@rollup/plugin-replace";
 
@@ -43,6 +44,16 @@ const config = {
       "process.env.API_URL": JSON.stringify(API_URL),
     }),
     typescript(),
+    ...(isLocalBuild
+      ? []
+      : [
+          terser({
+            format: { comments: false },
+            // Keep console.error/warn for merchant-store debugging; strip noisy log/debug.
+            compress: { passes: 2, drop_console: ["log", "debug"] },
+            mangle: { toplevel: false },
+          }),
+        ]),
     copy({
       targets: [
         { src: "src/styles.css", dest: outputDir },

@@ -190,15 +190,18 @@ function appendRealTriggersSection(
 type ScrollQaOptions = {
   getAssistant: () => ScrollQaAssistant | null;
   getNudgeDevPanel: () => HTMLElement | null;
+  /** When false, skip injecting the scroll-QA host page (e.g. dashboard embed). */
+  enabled?: boolean;
 };
 
 let scrollQaInstalled = false;
 
 /**
  * Tall host page + real-trigger controls inside the nudge dev panel (nudge-dev builds only).
+ * Skipped unless the host is the SDK local test page (see isLocalNudgeDevHostPage).
  */
 export function installNudgeScrollQa(options: ScrollQaOptions): void {
-  if (scrollQaInstalled) return;
+  if (options.enabled === false || scrollQaInstalled) return;
   scrollQaInstalled = true;
   ensureScrollableHostPage();
   const panel = options.getNudgeDevPanel();

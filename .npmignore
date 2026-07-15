@@ -1,4 +1,10 @@
+# Keep in sync with package.json "files" — whitelist is authoritative for publish.
+# Local-only / repo tooling (not shipped to npm or unpkg):
 .gitignore
 node_modules
 coverage
 .husky
+dist-local
+index.html
+src
+*.map

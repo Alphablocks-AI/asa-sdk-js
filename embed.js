@@ -3,9 +3,9 @@
  * Works in React, Next.js, and vanilla HTML
  *
  * Lifecycle:
- * - Initializes once per page load. A guard avoids double-init if this loader runs twice in the
- *   same document (duplicate tags, dynamic re-insert). A full refresh loads a new document, so
- *   initialization runs again as usual.
+ * - Skips init if the widget iframe is already mounted (success or duplicate script tag).
+ * - A shared in-flight flag blocks overlapping inits while the first one is still loading.
+ * - No permanent guard — if init fails or the host removes the widget DOM (SPA), a later run can retry.
  * - One store / site typically installs one widget (one public token).
  *
  * Prefer placing before </body> with defer for minimal HTML parser blocking:
@@ -36,6 +36,9 @@
 
   /** Only AlphaBlocks loader URLs (avoids matching unrelated scripts with "embed" in the path). */
   const LOADER_SCRIPT_SELECTOR = 'script[src*="embed-dev.js"], script[src*="embed.js"]';
+  const WRAPPER_ID = "alphablocks-assistant-container";
+  /** Shared across duplicate embed tags while SDK load + widget mount is in progress. */
+  const EMBED_IN_FLIGHT_KEY = "__ALPHABLOCKS_EMBED_START_IN_FLIGHT__";
 
   /**
    * When served as .../embed.js, load the UMD from the same base path (.../dist/index.umd.js)
@@ -59,8 +62,14 @@
     defaultSdkUrlFromCurrentScript() ||
     "https://unpkg.com/asa-sdk@latest/dist/index.umd.js";
 
-  /** Ensures one init per document; cleared automatically on full page navigation / refresh. */
-  const EMBED_GUARD_KEY = "__ALPHABLOCKS_EMBED_INITIALIZED__";
+  function isWidgetMounted() {
+    try {
+      const container = document.getElementById(WRAPPER_ID);
+      return Boolean(container && container.querySelector("iframe"));
+    } catch {
+      return false;
+    }
+  }
 
   function normalizeToken(rawToken) {
     if (typeof rawToken !== "string") return null;
@@ -147,49 +156,58 @@
       return;
     }
 
+    if (isWidgetMounted()) return;
+
     try {
       const props = { token: token };
       if (userId) props.userId = userId;
       const assistant = new window.AlphaBlocks(props);
-      await assistant.renderWrapper();
-      assistant.showAssistant();
+      assistant.renderWrapper();
+      await assistant.showAssistant();
     } catch (error) {
       console.error("AlphaBlocks: Failed to initialize widget", error);
     }
   }
 
   /**
-   * Load SDK script if not already loaded
+   * Load the SDK (once), then initialize the widget. Clears the in-flight flag when settled.
    */
   function loadSDK(token, userId) {
+    const runInit = () =>
+      initWidget(token, userId)
+        .catch((error) => {
+          console.error("AlphaBlocks: Failed to initialize widget", error);
+        })
+        .finally(() => {
+          window[EMBED_IN_FLIGHT_KEY] = false;
+        });
+
+    const onSdkLoadFailed = () => {
+      window[EMBED_IN_FLIGHT_KEY] = false;
+      console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
+    };
+
+    // SDK already available (prior run or manual include).
     if (window.AlphaBlocks) {
-      initWidget(token, userId).catch((error) => {
-        console.error("AlphaBlocks: Failed to initialize widget", error);
-      });
+      runInit();
       return;
     }
 
+    // A matching SDK script exists but hasn't executed yet (AlphaBlocks is still
+    // undefined above), so its load/error event is still pending — just wait for it.
     const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
     if (existingScript) {
-      existingScript.addEventListener("load", () => {
-        initWidget(token, userId).catch((error) => {
-          console.error("AlphaBlocks: Failed to initialize widget", error);
-        });
-      });
+      existingScript.addEventListener("load", runInit, { once: true });
+      existingScript.addEventListener("error", onSdkLoadFailed, { once: true });
       return;
     }
 
+    // First load — inject the SDK script.
     const script = document.createElement("script");
     script.src = SDK_URL;
     script.async = true;
-    script.onload = () => {
-      initWidget(token, userId).catch((error) => {
-        console.error("AlphaBlocks: Failed to initialize widget", error);
-      });
-    };
-    script.onerror = () => {
-      console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
-    };
+    script.onload = runInit;
+    script.onerror = onSdkLoadFailed;
 
     (document.head || document.body || document.documentElement).appendChild(script);
   }
@@ -207,7 +225,7 @@
 
   function init() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
-    if (window[EMBED_GUARD_KEY]) return;
+    if (isWidgetMounted() || window[EMBED_IN_FLIGHT_KEY] === true) return;
 
     const token = getToken();
     const userId = getUserId();
@@ -218,7 +236,8 @@
       );
       return;
     }
-    window[EMBED_GUARD_KEY] = true;
+
+    window[EMBED_IN_FLIGHT_KEY] = true;
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => scheduleLoadSDK(token, userId));
