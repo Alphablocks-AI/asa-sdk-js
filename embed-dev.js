@@ -183,54 +183,47 @@
       const props = { token: token };
       if (userId) props.userId = userId;
       const assistant = new window.AlphaBlocks(props);
-      await assistant.renderWrapper();
+      assistant.renderWrapper();
       await assistant.showAssistant();
     } catch (error) {
       console.error("AlphaBlocks: Failed to initialize widget", error);
     }
   }
 
+  /**
+   * Load the SDK (once), then initialize the widget. Clears the in-flight flag when settled.
+   */
   function loadSDK(token, userId) {
-    const clearInFlight = () => {
-      window[EMBED_IN_FLIGHT_KEY] = false;
-    };
-
     const runInit = () =>
       initWidget(token, userId)
         .catch((error) => {
           console.error("AlphaBlocks: Failed to initialize widget", error);
         })
-        .finally(clearInFlight);
+        .finally(() => {
+          window[EMBED_IN_FLIGHT_KEY] = false;
+        });
 
     const onSdkLoadFailed = () => {
-      clearInFlight();
+      window[EMBED_IN_FLIGHT_KEY] = false;
       console.error("AlphaBlocks: Failed to load SDK from", SDK_URL);
     };
 
+    // SDK already available (prior run or manual include).
     if (window.AlphaBlocks) {
       runInit();
       return;
     }
 
+    // A matching SDK script exists but hasn't executed yet (AlphaBlocks is still
+    // undefined above), so its load/error event is still pending — just wait for it.
     const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
     if (existingScript) {
-      if (window.AlphaBlocks) {
-        runInit();
-        return;
-      }
-
-      const readyState = existingScript.readyState;
-      if (readyState === "complete" || readyState === "loaded") {
-        if (window.AlphaBlocks) runInit();
-        else onSdkLoadFailed();
-        return;
-      }
-
       existingScript.addEventListener("load", runInit, { once: true });
       existingScript.addEventListener("error", onSdkLoadFailed, { once: true });
       return;
     }
 
+    // First load — inject the SDK script.
     const script = document.createElement("script");
     script.src = SDK_URL;
     script.async = true;
@@ -253,7 +246,7 @@
 
   function init() {
     if (typeof window === "undefined" || typeof document === "undefined") return;
-    if (isWidgetMounted() || window[EMBED_IN_FLIGHT_KEY]) return;
+    if (isWidgetMounted() || window[EMBED_IN_FLIGHT_KEY] === true) return;
 
     const token = getToken();
     const userId = getUserId();
