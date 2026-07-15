@@ -49,7 +49,8 @@ const config = {
       : [
           terser({
             format: { comments: false },
-            compress: { passes: 2, drop_console: true },
+            // Keep console.error/warn for merchant-store debugging; strip noisy log/debug.
+            compress: { passes: 2, drop_console: ["log", "debug"] },
             mangle: { toplevel: false },
           }),
         ]),
