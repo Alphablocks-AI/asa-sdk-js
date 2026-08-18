@@ -40,6 +40,8 @@ build/Release
 dist/
 dist-dev/
 dist-local/
+# tsc declaration output (declarationDir in tsconfig.json) — generated, not source
+types/
 # Dependency directories
 node_modules/
 jspm_packages/

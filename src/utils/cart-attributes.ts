@@ -160,6 +160,19 @@ function hasChatSessionEvidence(
 }
 
 /**
+ * True only when the SDK's OWN live session id is populated — unlike
+ * `shouldSyncCartAttributes`, this does not accept the cart's stale `ai_session_id` as a
+ * substitute. Used to gate what counts as "ready" during the retry loop below, so a
+ * rotated session isn't re-stamped with the cart's old value before the SDK has had a
+ * real chance to catch up.
+ */
+function isLiveSessionReady(ctx: CartAttributeContext): boolean {
+  return (
+    Boolean(ctx.assistantId) && Boolean(ctx.endUserId) && (ctx.sessionId ?? "").trim().length > 0
+  );
+}
+
+/**
  * Resolve a context that is actually ready to write.
  *
  * `getCtx` is re-invoked on each retry so this picks up whatever the SDK's live context
@@ -170,27 +183,45 @@ function hasChatSessionEvidence(
  * Waiting is gated on a chat session actually existing. A visitor who never chatted is a
  * legitimate no-op, resolved immediately: retrying there would stall the cart queue and
  * log an error on every ordinary storefront add-to-cart.
+ *
+ * Readiness requires the SDK's *live* `ctx.sessionId`, not just `shouldSyncCartAttributes`
+ * (which would also accept the cart's stale `ai_session_id` as "ready"). If that fallback
+ * were checked first, a session rotation followed by a storefront add in the same instant
+ * would re-stamp the cart with the OLD session on attempt one, before ever giving the live
+ * value a chance to arrive — silently defeating the whole point of retrying. The stale
+ * fallback is only accepted as a last resort, after the retry budget is exhausted.
  */
 export async function resolveReadyAttributeContext(
   getCtx: () => CartAttributeContext,
   existingAttrs: Record<string, string>,
 ): Promise<AttributeReadiness> {
   let ctx = getCtx();
-  if (shouldSyncCartAttributes(ctx, existingAttrs)) return { status: "ready", ctx };
+  if (isLiveSessionReady(ctx)) return { status: "ready", ctx };
   if (!hasChatSessionEvidence(ctx, existingAttrs)) return { status: "no-chat-session" };
 
   for (let attempt = 0; attempt < SYNC_READY_MAX_ATTEMPTS; attempt++) {
     await sleep(SYNC_READY_RETRY_DELAY_MS);
     ctx = getCtx();
-    if (shouldSyncCartAttributes(ctx, existingAttrs)) return { status: "ready", ctx };
+    if (isLiveSessionReady(ctx)) return { status: "ready", ctx };
   }
+
+  // The live session id never arrived within budget — degrade to the cart's existing
+  // value now (graceful degradation), rather than never having retried for the live one.
+  if (shouldSyncCartAttributes(ctx, existingAttrs)) return { status: "ready", ctx };
 
   return { status: "timed-out", ctx };
 }
 
-export async function syncCartAttributes(
-  getCtx: () => CartAttributeContext,
-): Promise<void> {
+/**
+ * Deploy note: this SDK's attribution correctness now depends on the widget
+ * (`Asa-MonoRepo/apps/widget`) re-asserting the current session via
+ * `alphablocks-set-cart-attributes` on every resolved send (see `resolveSession` in
+ * `hooks/useSessionId.ts`), and on the lazy `getCtx()` + retry design here to actually
+ * wait for that. An SDK build older than this readiness rework paired with a widget
+ * build that expects it (or vice versa) leaves the hydration race this file exists to
+ * close unfixed. Ship SDK and widget releases that touch cart attribution together.
+ */
+export async function syncCartAttributes(getCtx: () => CartAttributeContext): Promise<void> {
   try {
     const cart = await getCart();
     const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
