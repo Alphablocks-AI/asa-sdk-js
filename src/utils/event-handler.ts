@@ -1,11 +1,11 @@
 import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
 import {
   buildAsaCartAttributes,
-  CART_ATTR_KEYS,
   persistCartAttributes,
   resolveEffectiveSessionId,
-  shouldSyncCartAttributes,
+  resolveReadyAttributeContext,
   syncCartAttributes,
+  type CartAttributeContext,
 } from "./cart-attributes.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
@@ -90,15 +90,13 @@ export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
 
 // 🔹 2. Update only attributes (no response returned)
 export async function handleSetCartAttributes(
-  assistantId: number | null,
-  endUserId: string,
-  sessionId?: string,
+  getCtx: () => {
+    assistantId: number | null;
+    endUserId: string;
+    sessionId?: string;
+  },
 ): Promise<void> {
-  await syncCartAttributes({
-    assistantId,
-    endUserId,
-    sessionId,
-  });
+  await syncCartAttributes(getCtx);
 }
 
 // 🔹 3. Add product to cart (returns updated cart in message)
@@ -106,9 +104,7 @@ export async function handleAddProductToCart(
   variantId: number | undefined,
   quantity: number = 1,
   iframe: HTMLIFrameElement | null,
-  assistantId: number | null,
-  endUserId: string,
-  sessionId?: string,
+  getCtx: () => Omit<CartAttributeContext, "variantIdsToAppend">,
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
@@ -118,18 +114,23 @@ export async function handleAddProductToCart(
     const cart = await getCart();
     const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
 
-    // Race-condition guard: if widget didn't send sessionId yet, read from cart
-    const resolvedSessionId =
-      (sessionId ?? "").trim() || (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
+    // Wait (briefly, and only when a chat session actually exists) for assistantId /
+    // endUserId to hydrate, rather than instantly falling back to whatever session is
+    // already on the cart — that instant fallback is what re-stamped stale sessions.
+    const readiness = await resolveReadyAttributeContext(getCtx, existingAttrs);
 
-    const attrCtx = {
-      assistantId,
-      endUserId,
-      sessionId: resolvedSessionId,
-      variantIdsToAppend: [variantId],
-    };
+    if (readiness.status === "timed-out") {
+      console.error(
+        "handleAddProductToCart: chat session exists but assistantId/endUserId never became ready — line added WITHOUT ASA attribution",
+        readiness.ctx,
+      );
+    }
 
-    if (shouldSyncCartAttributes(attrCtx, existingAttrs)) {
+    if (readiness.status === "ready") {
+      const attrCtx = {
+        ...readiness.ctx,
+        variantIdsToAppend: [variantId],
+      };
       const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
       const updatedAttrs = buildAsaCartAttributes(existingAttrs, {
         ...attrCtx,
@@ -159,15 +160,13 @@ export async function handleAddProductToCart(
 
 /** Storefront `/cart/add.js` — sync session attrs only (no line items). */
 export async function handleStorefrontCartLineAdded(
-  assistantId: number | null,
-  endUserId: string,
-  sessionId: string | undefined,
+  getCtx: () => {
+    assistantId: number | null;
+    endUserId: string;
+    sessionId?: string;
+  },
 ): Promise<void> {
-  await syncCartAttributes({
-    assistantId,
-    endUserId,
-    sessionId,
-  });
+  await syncCartAttributes(getCtx);
 }
 
 export async function handleCheckSearchProducts(

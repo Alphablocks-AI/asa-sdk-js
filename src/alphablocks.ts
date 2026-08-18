@@ -302,16 +302,22 @@ export class AlphaBlocks {
     this.cartUpdateQueue = this.cartUpdateQueue
       .then(async () => {
         if (event === "alphablocks-set-cart-attributes") {
-          await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
+          await handleSetCartAttributes(() => ({
+            assistantId: this.assistantId,
+            endUserId: this.endUserId,
+            sessionId: this.sessionId,
+          }));
         }
         if (event === "alphablocks-add-product-to-cart") {
           await handleAddProductToCart(
             data.variantId,
             data.quantity,
             this.iframe,
-            this.assistantId,
-            this.endUserId,
-            this.sessionId,
+            () => ({
+              assistantId: this.assistantId,
+              endUserId: this.endUserId,
+              sessionId: this.sessionId,
+            }),
           );
         }
         if (event === "alphablocks-get-cart-details") {
