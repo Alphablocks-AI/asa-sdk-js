@@ -100,11 +100,16 @@ export async function handleSetCartAttributes(
 }
 
 // 🔹 3. Add product to cart (returns updated cart in message)
+/** Widget-driven ATC only — appends `ai_line_items` + optional `ai_source_note`. */
 export async function handleAddProductToCart(
   variantId: number | undefined,
   quantity: number = 1,
   iframe: HTMLIFrameElement | null,
-  getCtx: () => Omit<CartAttributeContext, "variantIdsToAppend">,
+  getCtx: () => Omit<
+    CartAttributeContext,
+    "variantIdsToAppend" | "sourceNotesToAppend"
+  >,
+  options?: { sourceNote?: string },
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
@@ -127,9 +132,11 @@ export async function handleAddProductToCart(
     }
 
     if (readiness.status === "ready") {
-      const attrCtx = {
+      const sourceNote = (options?.sourceNote ?? "").trim();
+      const attrCtx: CartAttributeContext = {
         ...readiness.ctx,
         variantIdsToAppend: [variantId],
+        ...(sourceNote ? { sourceNotesToAppend: [sourceNote] } : {}),
       };
       const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
       const updatedAttrs = buildAsaCartAttributes(existingAttrs, {

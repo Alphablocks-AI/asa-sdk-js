@@ -6,14 +6,21 @@ export const CART_ATTR_KEYS = {
   SESSION_ID: "asa.alphablocks.ai_session_id",
   OLD_SESSION_ID: "asa.alphablocks.ai_old_session_id",
   LINE_ITEMS: "asa.alphablocks.ai_line_items",
+  /** Comma-separated widget ATC provenance, e.g. `cart-carousel-nudge-123,product-card-456`. */
+  SOURCE_NOTE: "asa.alphablocks.ai_source_note",
 } as const;
 
 export type CartAttributeContext = {
   assistantId: number | null;
   endUserId: string;
   sessionId?: string;
-  /** When set, appends variant id(s) to `ai_line_items`. */
+  /** When set, appends variant id(s) to `ai_line_items` (widget ATC only). */
   variantIdsToAppend?: number[];
+  /**
+   * When set, appends entries to `ai_source_note` (widget ATC only).
+   * Shape: `{surface}-{productId}` e.g. `cart-carousel-nudge-123`.
+   */
+  sourceNotesToAppend?: string[];
 };
 
 /** Chat must exist before any ASA cart attribute is written (CRO attribution gate). */
@@ -91,6 +98,17 @@ export function buildAsaCartAttributes(
   if (variantIds.length > 0) {
     const existingLineItems = result[CART_ATTR_KEYS.LINE_ITEMS] ?? "";
     result[CART_ATTR_KEYS.LINE_ITEMS] = appendLineItems(existingLineItems, variantIds);
+  }
+
+  const sourceNotes = (ctx.sourceNotesToAppend ?? [])
+    .map((note) => note.trim())
+    .filter(Boolean);
+  if (sourceNotes.length > 0) {
+    const existingSourceNotes = result[CART_ATTR_KEYS.SOURCE_NOTE] ?? "";
+    result[CART_ATTR_KEYS.SOURCE_NOTE] = appendCommaSeparated(
+      existingSourceNotes,
+      sourceNotes,
+    );
   }
 
   return result;

@@ -318,6 +318,7 @@ export class AlphaBlocks {
               endUserId: this.endUserId,
               sessionId: this.sessionId,
             }),
+            { sourceNote: data.sourceNote },
           );
         }
         if (event === "alphablocks-get-cart-details") {
