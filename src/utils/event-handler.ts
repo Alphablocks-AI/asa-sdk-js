@@ -1,11 +1,7 @@
 import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
 import {
-  buildAsaCartAttributes,
-  persistCartAttributes,
-  resolveEffectiveSessionId,
-  resolveReadyAttributeContext,
   syncCartAttributes,
-  type CartAttributeContext,
+  type CartAttributeIdentity,
 } from "./cart-attributes.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
@@ -47,7 +43,7 @@ export async function refreshCartUI(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           updates: { [key]: cart.items[0].quantity },
-          attributes: cart.attributes ?? {}, // ← ADD THIS
+          attributes: cart.attributes ?? {},
         }),
       });
     }
@@ -90,13 +86,10 @@ export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
 
 // 🔹 2. Update only attributes (no response returned)
 export async function handleSetCartAttributes(
-  getCtx: () => {
-    assistantId: number | null;
-    endUserId: string;
-    sessionId?: string;
-  },
+  identity: CartAttributeIdentity,
+  refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">,
 ): Promise<void> {
-  await syncCartAttributes(getCtx);
+  await syncCartAttributes(identity, {}, refreshIdentity);
 }
 
 // 🔹 3. Add product to cart (returns updated cart in message)
@@ -105,46 +98,26 @@ export async function handleAddProductToCart(
   variantId: number | undefined,
   quantity: number = 1,
   iframe: HTMLIFrameElement | null,
-  getCtx: () => Omit<
-    CartAttributeContext,
-    "variantIdsToAppend" | "sourceNotesToAppend"
-  >,
-  options?: { sourceNote?: string },
+  identity: CartAttributeIdentity,
+  options?: {
+    sourceNote?: string;
+    refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">;
+  },
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
   try {
     await addToCart(variantId, quantity);
 
-    const cart = await getCart();
-    const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
-
-    // Wait (briefly, and only when a chat session actually exists) for assistantId /
-    // endUserId to hydrate, rather than instantly falling back to whatever session is
-    // already on the cart — that instant fallback is what re-stamped stale sessions.
-    const readiness = await resolveReadyAttributeContext(getCtx, existingAttrs);
-
-    if (readiness.status === "timed-out") {
-      console.error(
-        "handleAddProductToCart: chat session exists but assistantId/endUserId never became ready — line added WITHOUT ASA attribution",
-        readiness.ctx,
-      );
-    }
-
-    if (readiness.status === "ready") {
-      const sourceNote = (options?.sourceNote ?? "").trim();
-      const attrCtx: CartAttributeContext = {
-        ...readiness.ctx,
+    const sourceNote = (options?.sourceNote ?? "").trim();
+    await syncCartAttributes(
+      identity,
+      {
         variantIdsToAppend: [variantId],
         ...(sourceNote ? { sourceNotesToAppend: [sourceNote] } : {}),
-      };
-      const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
-      const updatedAttrs = buildAsaCartAttributes(existingAttrs, {
-        ...attrCtx,
-        sessionId: effectiveSessionId,
-      });
-      await persistCartAttributes(cart.item_count ?? 0, updatedAttrs);
-    }
+      },
+      options?.refreshIdentity,
+    );
 
     await refreshCartUI();
 
@@ -167,13 +140,10 @@ export async function handleAddProductToCart(
 
 /** Storefront `/cart/add.js` — sync session attrs only (no line items). */
 export async function handleStorefrontCartLineAdded(
-  getCtx: () => {
-    assistantId: number | null;
-    endUserId: string;
-    sessionId?: string;
-  },
+  identity: CartAttributeIdentity,
+  refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">,
 ): Promise<void> {
-  await syncCartAttributes(getCtx);
+  await syncCartAttributes(identity, {}, refreshIdentity);
 }
 
 export async function handleCheckSearchProducts(

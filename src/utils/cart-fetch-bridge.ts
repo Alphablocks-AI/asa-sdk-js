@@ -1,5 +1,6 @@
 import { CART_AJAX_EVENT, type CartAjaxEventName } from "./cart-ajax-constants.ts";
 import { handleStorefrontCartLineAdded } from "./event-handler.ts";
+import { enqueueCartWrite } from "./cart-write-queue.ts";
 
 export type CartAttributeBridgeContext = {
   assistantId: number | null;
@@ -42,24 +43,38 @@ function isSdkOriginatedLine(line: UnknownRecord): boolean {
   return props.source === ASA_CART_LINE_SOURCE;
 }
 
-async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
-  const storefrontLines = lines.filter((line) => !isSdkOriginatedLine(line));
-  if (storefrontLines.length === 0) return;
-
-  // Bail only if no AlphaBlocks instance ever registered a context resolver (nothing to
-  // sync, structurally). Do NOT bail just because assistantId/endUserId are momentarily
-  // unset — that's the hydration race (fast storefront add-to-cart racing assistant
-  // hydration); let syncCartAttributes retry against the live context instead of
-  // silently dropping it.
-  if (resolveCartAttributeContext() === null) return;
-
-  await handleStorefrontCartLineAdded(() => {
+function storefrontCartIdentity(): {
+  identity: {
+    assistantId: number | null;
+    endUserId: string;
+    sessionId?: string;
+  };
+  refreshIdentity: () => { assistantId: number | null; endUserId: string };
+} {
+  const refreshIdentity = () => {
     const ctx = resolveCartAttributeContext();
     return {
       assistantId: ctx?.assistantId ?? null,
       endUserId: ctx?.endUserId ?? "",
-      sessionId: ctx?.sessionId || undefined,
     };
+  };
+  return {
+    identity: {
+      ...refreshIdentity(),
+      sessionId: resolveCartAttributeContext()?.sessionId || undefined,
+    },
+    refreshIdentity,
+  };
+}
+
+async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
+  const storefrontLines = lines.filter((line) => !isSdkOriginatedLine(line));
+  if (storefrontLines.length === 0) return;
+  if (resolveCartAttributeContext() === null) return;
+
+  await enqueueCartWrite(() => {
+    const { identity, refreshIdentity } = storefrontCartIdentity();
+    return handleStorefrontCartLineAdded(identity, refreshIdentity);
   });
 }
 
@@ -475,17 +490,12 @@ async function onFetchSettled(
     const decremented = findQuantityDecrementedLines(prevItems, nextItems);
     cartSnapshotCache = newCart;
 
-    // Re-write ASA attrs if theme update wiped them. No readiness gate here either —
-    // let syncCartAttributes retry against the live context (see above).
+    // Re-write ASA attrs if theme update wiped them.
     const attrs = (newCart.attributes as Record<string, string>) ?? {};
     if (!attrs["asa.alphablocks.ai_session_id"] && resolveCartAttributeContext() !== null) {
-      void handleStorefrontCartLineAdded(() => {
-        const ctx = resolveCartAttributeContext();
-        return {
-          assistantId: ctx?.assistantId ?? null,
-          endUserId: ctx?.endUserId ?? "",
-          sessionId: ctx?.sessionId || undefined,
-        };
+      void enqueueCartWrite(() => {
+        const { identity, refreshIdentity } = storefrontCartIdentity();
+        return handleStorefrontCartLineAdded(identity, refreshIdentity);
       }).catch((err) => {
         console.error("[ASA] cart self-heal sync failed:", err);
       });
