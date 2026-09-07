@@ -48,6 +48,7 @@ import {
   registerCartAttributeContext,
   registerCartBridgeIframe,
 } from "./utils/cart-fetch-bridge.ts";
+import { enqueueCartWrite } from "./utils/cart-write-queue.ts";
 import {
   isLocalNudgeDevHostPage,
   mountNudgeDevPanelIfLocal,
@@ -86,7 +87,6 @@ export class AlphaBlocks {
   public sessionId: string = "";
   public userId: string = "";
   public isActive: boolean = true;
-  private cartUpdateQueue: Promise<void> = Promise.resolve();
 
   constructor(props: AlphaBlocksConstructor) {
     registerCartBridgeIframe(() => this.iframe);
@@ -290,43 +290,61 @@ export class AlphaBlocks {
   }
 
   private handleCartUpdates(event: string, data: EventDataType): void {
-    // Capture sessionId synchronously before queuing
-    if (
-      (event === "alphablocks-set-cart-attributes" ||
-        event === "alphablocks-add-product-to-cart") &&
-      data.sessionId
-    ) {
-      this.sessionId = data.sessionId;
+    const incomingSessionId = (data.sessionId ?? "").trim();
+    const isAttrWrite =
+      event === "alphablocks-set-cart-attributes" ||
+      event === "alphablocks-add-product-to-cart";
+
+    if (isAttrWrite && incomingSessionId) {
+      this.sessionId = incomingSessionId;
     }
-    // Serialize all cart writes — prevents concurrent getCart/persist race
-    this.cartUpdateQueue = this.cartUpdateQueue
-      .then(async () => {
+
+    // Reads don't need the write queue — keep them snappy.
+    if (event === "alphablocks-get-cart-details") {
+      void handleGetCartDetails(this.iframe);
+      return;
+    }
+    if (event === "alphablocks-check-search-products") {
+      void handleCheckSearchProducts(data.query || "", this.iframe);
+      return;
+    }
+    if (event === "alphablocks-get-product-by-handle") {
+      void handleGetProductByHandle(data.handle || "", this.iframe);
+      return;
+    }
+
+    if (!isAttrWrite) return;
+
+    // Pin session for this write; refresh assistant/endUser live during hydrate wait.
+    const pinnedSessionId = incomingSessionId || this.sessionId;
+    const refreshIdentity = () => ({
+      assistantId: this.assistantId,
+      endUserId: this.endUserId,
+    });
+
+    void enqueueCartWrite(async () => {
+      try {
+        const identity = {
+          assistantId: this.assistantId,
+          endUserId: this.endUserId,
+          sessionId: pinnedSessionId,
+        };
         if (event === "alphablocks-set-cart-attributes") {
-          await handleSetCartAttributes(this.assistantId, this.endUserId, this.sessionId);
+          await handleSetCartAttributes(identity, refreshIdentity);
         }
         if (event === "alphablocks-add-product-to-cart") {
           await handleAddProductToCart(
             data.variantId,
             data.quantity,
             this.iframe,
-            this.assistantId,
-            this.endUserId,
-            this.sessionId,
+            identity,
+            { sourceNote: data.sourceNote, refreshIdentity },
           );
         }
-        if (event === "alphablocks-get-cart-details") {
-          await handleGetCartDetails(this.iframe);
-        }
-        if (event === "alphablocks-check-search-products") {
-          await handleCheckSearchProducts(data.query || "", this.iframe);
-        }
-        if (event === "alphablocks-get-product-by-handle") {
-          await handleGetProductByHandle(data.handle || "", this.iframe);
-        }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("[ASA] cartUpdateQueue error:", err);
-      });
+      }
+    });
   }
 
   public renderPill(container: string | HTMLElement): void {

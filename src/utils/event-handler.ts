@@ -1,11 +1,7 @@
 import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
 import {
-  buildAsaCartAttributes,
-  CART_ATTR_KEYS,
-  persistCartAttributes,
-  resolveEffectiveSessionId,
-  shouldSyncCartAttributes,
   syncCartAttributes,
+  type CartAttributeIdentity,
 } from "./cart-attributes.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
@@ -47,7 +43,7 @@ export async function refreshCartUI(): Promise<void> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           updates: { [key]: cart.items[0].quantity },
-          attributes: cart.attributes ?? {}, // ← ADD THIS
+          attributes: cart.attributes ?? {},
         }),
       });
     }
@@ -90,53 +86,38 @@ export async function handleGetCartDetails(iframe: HTMLIFrameElement | null) {
 
 // 🔹 2. Update only attributes (no response returned)
 export async function handleSetCartAttributes(
-  assistantId: number | null,
-  endUserId: string,
-  sessionId?: string,
+  identity: CartAttributeIdentity,
+  refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">,
 ): Promise<void> {
-  await syncCartAttributes({
-    assistantId,
-    endUserId,
-    sessionId,
-  });
+  await syncCartAttributes(identity, {}, refreshIdentity);
 }
 
 // 🔹 3. Add product to cart (returns updated cart in message)
+/** Widget-driven ATC only — appends `ai_line_items` + optional `ai_source_note`. */
 export async function handleAddProductToCart(
   variantId: number | undefined,
   quantity: number = 1,
   iframe: HTMLIFrameElement | null,
-  assistantId: number | null,
-  endUserId: string,
-  sessionId?: string,
+  identity: CartAttributeIdentity,
+  options?: {
+    sourceNote?: string;
+    refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">;
+  },
 ): Promise<void> {
   if (!variantId || !iframe?.contentWindow) return;
 
   try {
     await addToCart(variantId, quantity);
 
-    const cart = await getCart();
-    const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
-
-    // Race-condition guard: if widget didn't send sessionId yet, read from cart
-    const resolvedSessionId =
-      (sessionId ?? "").trim() || (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
-
-    const attrCtx = {
-      assistantId,
-      endUserId,
-      sessionId: resolvedSessionId,
-      variantIdsToAppend: [variantId],
-    };
-
-    if (shouldSyncCartAttributes(attrCtx, existingAttrs)) {
-      const effectiveSessionId = resolveEffectiveSessionId(attrCtx, existingAttrs);
-      const updatedAttrs = buildAsaCartAttributes(existingAttrs, {
-        ...attrCtx,
-        sessionId: effectiveSessionId,
-      });
-      await persistCartAttributes(cart.item_count ?? 0, updatedAttrs);
-    }
+    const sourceNote = (options?.sourceNote ?? "").trim();
+    await syncCartAttributes(
+      identity,
+      {
+        variantIdsToAppend: [variantId],
+        ...(sourceNote ? { sourceNotesToAppend: [sourceNote] } : {}),
+      },
+      options?.refreshIdentity,
+    );
 
     await refreshCartUI();
 
@@ -159,15 +140,10 @@ export async function handleAddProductToCart(
 
 /** Storefront `/cart/add.js` — sync session attrs only (no line items). */
 export async function handleStorefrontCartLineAdded(
-  assistantId: number | null,
-  endUserId: string,
-  sessionId: string | undefined,
+  identity: CartAttributeIdentity,
+  refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">,
 ): Promise<void> {
-  await syncCartAttributes({
-    assistantId,
-    endUserId,
-    sessionId,
-  });
+  await syncCartAttributes(identity, {}, refreshIdentity);
 }
 
 export async function handleCheckSearchProducts(

@@ -6,26 +6,39 @@ export const CART_ATTR_KEYS = {
   SESSION_ID: "asa.alphablocks.ai_session_id",
   OLD_SESSION_ID: "asa.alphablocks.ai_old_session_id",
   LINE_ITEMS: "asa.alphablocks.ai_line_items",
+  /** Comma-separated widget ATC provenance, e.g. `cart-carousel-nudge-123,product-card-456`. */
+  SOURCE_NOTE: "asa.alphablocks.ai_source_note",
 } as const;
 
 export type CartAttributeContext = {
   assistantId: number | null;
   endUserId: string;
   sessionId?: string;
-  /** When set, appends variant id(s) to `ai_line_items`. */
+  /** When set, appends variant id(s) to `ai_line_items` (widget ATC only). */
   variantIdsToAppend?: number[];
+  /**
+   * When set, appends entries to `ai_source_note` (widget ATC only).
+   * Shape: `{surface}-{productId}` e.g. `cart-carousel-nudge-123`.
+   */
+  sourceNotesToAppend?: string[];
 };
+
+/** Identity fields the host can refresh while we wait for assistant hydration. */
+export type CartAttributeIdentity = Pick<
+  CartAttributeContext,
+  "assistantId" | "endUserId" | "sessionId"
+>;
 
 /** Chat must exist before any ASA cart attribute is written (CRO attribution gate). */
 export function resolveEffectiveSessionId(
-  ctx: CartAttributeContext,
+  ctx: CartAttributeIdentity,
   existingAttrs: Record<string, string>,
 ): string {
   return (ctx.sessionId ?? "").trim() || (existingAttrs[CART_ATTR_KEYS.SESSION_ID] ?? "").trim();
 }
 
 export function shouldSyncCartAttributes(
-  ctx: CartAttributeContext,
+  ctx: CartAttributeIdentity,
   existingAttrs: Record<string, string>,
 ): boolean {
   if (!ctx.assistantId || !ctx.endUserId) return false;
@@ -93,6 +106,17 @@ export function buildAsaCartAttributes(
     result[CART_ATTR_KEYS.LINE_ITEMS] = appendLineItems(existingLineItems, variantIds);
   }
 
+  const sourceNotes = (ctx.sourceNotesToAppend ?? [])
+    .map((note) => note.trim())
+    .filter(Boolean);
+  if (sourceNotes.length > 0) {
+    const existingSourceNotes = result[CART_ATTR_KEYS.SOURCE_NOTE] ?? "";
+    result[CART_ATTR_KEYS.SOURCE_NOTE] = appendCommaSeparated(
+      existingSourceNotes,
+      sourceNotes,
+    );
+  }
+
   return result;
 }
 
@@ -107,6 +131,14 @@ function attrsMatchExpected(
 }
 
 const MAX_PERSIST_ATTEMPTS = 3;
+
+/** ~1.8s — only used when a chat session exists but assistantId/endUserId are still hydrating. */
+const HYDRATE_ATTEMPTS = 6;
+const HYDRATE_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Persist cart attributes with retries when Shopify does not echo them back.
@@ -128,18 +160,43 @@ export async function persistCartAttributes(
   console.error("persistCartAttributes: attributes did not persist after retries", attributes);
 }
 
-export async function syncCartAttributes(ctx: CartAttributeContext): Promise<void> {
+/**
+ * Write ASA cart attributes.
+ *
+ * - No chat session (SDK or cart) → no-op (ordinary storefront ATC).
+ * - Session exists but assistant/endUser still hydrating → brief wait via `refreshIdentity`.
+ * - `sessionId` on `identity` should be pinned by the caller for that write.
+ *
+ * Ship with widget builds that re-assert session via `alphablocks-set-cart-attributes`.
+ */
+export async function syncCartAttributes(
+  identity: CartAttributeIdentity,
+  extras: Pick<CartAttributeContext, "variantIdsToAppend" | "sourceNotesToAppend"> = {},
+  refreshIdentity?: () => Pick<CartAttributeIdentity, "assistantId" | "endUserId">,
+): Promise<void> {
   try {
     const cart = await getCart();
     const existingAttrs = (cart.attributes ?? {}) as Record<string, string>;
+
+    let ctx: CartAttributeContext = { ...identity, ...extras };
+    if (!resolveEffectiveSessionId(ctx, existingAttrs)) return;
+
+    if ((!ctx.assistantId || !ctx.endUserId) && refreshIdentity) {
+      for (let attempt = 0; attempt < HYDRATE_ATTEMPTS; attempt++) {
+        await sleep(HYDRATE_DELAY_MS);
+        const next = refreshIdentity();
+        ctx = { ...ctx, assistantId: next.assistantId, endUserId: next.endUserId };
+        if (ctx.assistantId && ctx.endUserId) break;
+      }
+    }
+
     if (!shouldSyncCartAttributes(ctx, existingAttrs)) return;
 
-    const effectiveSessionId = resolveEffectiveSessionId(ctx, existingAttrs);
-    const merged = buildAsaCartAttributes(existingAttrs, {
-      ...ctx,
-      sessionId: effectiveSessionId,
-    });
-    await persistCartAttributes(cart.item_count ?? 0, merged);
+    const sessionId = resolveEffectiveSessionId(ctx, existingAttrs);
+    await persistCartAttributes(
+      cart.item_count ?? 0,
+      buildAsaCartAttributes(existingAttrs, { ...ctx, sessionId }),
+    );
   } catch (err) {
     console.error("syncCartAttributes error:", err);
   }

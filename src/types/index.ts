@@ -38,6 +38,11 @@ export interface EventDataType {
   sessionId?: string;
   variantId?: number;
   quantity?: number;
+  /**
+   * Widget ATC provenance for `asa.alphablocks.ai_source_note`
+   * (e.g. `cart-carousel-nudge-123`). Appended as a comma-separated list.
+   */
+  sourceNote?: string;
   event?: string;
   frameBorderRadius?: string;
   marginBottom?: string;

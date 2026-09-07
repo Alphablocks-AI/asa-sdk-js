@@ -1,5 +1,6 @@
 import { CART_AJAX_EVENT, type CartAjaxEventName } from "./cart-ajax-constants.ts";
 import { handleStorefrontCartLineAdded } from "./event-handler.ts";
+import { enqueueCartWrite } from "./cart-write-queue.ts";
 
 export type CartAttributeBridgeContext = {
   assistantId: number | null;
@@ -42,14 +43,39 @@ function isSdkOriginatedLine(line: UnknownRecord): boolean {
   return props.source === ASA_CART_LINE_SOURCE;
 }
 
+function storefrontCartIdentity(): {
+  identity: {
+    assistantId: number | null;
+    endUserId: string;
+    sessionId?: string;
+  };
+  refreshIdentity: () => { assistantId: number | null; endUserId: string };
+} {
+  const refreshIdentity = () => {
+    const ctx = resolveCartAttributeContext();
+    return {
+      assistantId: ctx?.assistantId ?? null,
+      endUserId: ctx?.endUserId ?? "",
+    };
+  };
+  return {
+    identity: {
+      ...refreshIdentity(),
+      sessionId: resolveCartAttributeContext()?.sessionId || undefined,
+    },
+    refreshIdentity,
+  };
+}
+
 async function syncStorefrontCartAttributesForAddedLines(lines: UnknownRecord[]): Promise<void> {
   const storefrontLines = lines.filter((line) => !isSdkOriginatedLine(line));
   if (storefrontLines.length === 0) return;
+  if (resolveCartAttributeContext() === null) return;
 
-  const ctx = resolveCartAttributeContext();
-  if (!ctx?.assistantId || !ctx.endUserId) return;
-
-  await handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId || undefined);
+  await enqueueCartWrite(() => {
+    const { identity, refreshIdentity } = storefrontCartIdentity();
+    return handleStorefrontCartLineAdded(identity, refreshIdentity);
+  });
 }
 
 function addedLinesFromCartDiff(
@@ -353,8 +379,8 @@ async function tryNotifyCartChangeFromSectionPayload(parsed: UnknownRecord): Pro
     postCartLineToWidget({ ...payloadFromLine(line, CART_AJAX_EVENT.PRODUCT_ADDED), cart });
   }
   if (added.length > 0) {
-    void syncStorefrontCartAttributesForAddedLines(added).catch(() => {
-      /* storefront fetch must not break */
+    void syncStorefrontCartAttributesForAddedLines(added).catch((err) => {
+      console.error("[ASA] cart attribute sync failed (section payload):", err);
     });
   }
 
@@ -445,7 +471,9 @@ async function onFetchSettled(
     })();
 
     if (linesForAttrs.length > 0) {
-      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch(() => {});
+      void syncStorefrontCartAttributesForAddedLines(linesForAttrs).catch((err) => {
+        console.error("[ASA] cart attribute sync failed (cart/add):", err);
+      });
     }
     return;
   }
@@ -462,15 +490,15 @@ async function onFetchSettled(
     const decremented = findQuantityDecrementedLines(prevItems, nextItems);
     cartSnapshotCache = newCart;
 
-    // Re-write ASA attrs if theme update wiped them
+    // Re-write ASA attrs if theme update wiped them.
     const attrs = (newCart.attributes as Record<string, string>) ?? {};
-    if (!attrs["asa.alphablocks.ai_session_id"]) {
-      const ctx = resolveCartAttributeContext();
-      if (ctx?.assistantId && ctx.endUserId && ctx.sessionId) {
-        void handleStorefrontCartLineAdded(ctx.assistantId, ctx.endUserId, ctx.sessionId).catch(
-          () => {},
-        );
-      }
+    if (!attrs["asa.alphablocks.ai_session_id"] && resolveCartAttributeContext() !== null) {
+      void enqueueCartWrite(() => {
+        const { identity, refreshIdentity } = storefrontCartIdentity();
+        return handleStorefrontCartLineAdded(identity, refreshIdentity);
+      }).catch((err) => {
+        console.error("[ASA] cart self-heal sync failed:", err);
+      });
     }
 
     const linesToNotify = [...removed, ...decremented];
@@ -507,8 +535,9 @@ export function installShopifyCartFetchBridge(): void {
   window.fetch = async (input: FetchInput, init?: FetchInit): Promise<Response> => {
     const response = await innerFetch(input, init);
     /** Await so nested `/cart.js` during `/cart/add.js` updates `cartSnapshotCache` before callers continue — otherwise remove diffs see an empty snapshot. */
-    await onFetchSettled(input, init, response).catch(() => {
-      /* ignore bridge errors — storefront fetch must not break */
+    await onFetchSettled(input, init, response).catch((err) => {
+      // Log only — storefront fetch must not break regardless of bridge failures.
+      console.error("[ASA] cart fetch bridge error:", err);
     });
     return response;
   };
