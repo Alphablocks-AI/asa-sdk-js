@@ -10,7 +10,7 @@ export const ASSISTANT_DETAILS_STORAGE_KEY = "alphablocks-assistant-details";
  * Host wrapper stacking order for closed launcher and open chat (same value).
  * Mid-range so theme cart drawers/sheets can sit above checkout CTAs; avoid max int.
  */
-export const ALPHABLOCKS_HOST_Z_INDEX = "1000";
+export const ALPHABLOCKS_HOST_Z_INDEX = "999";
 
 export const ASA_STOREFRONT_ACTION_ATTR = "data-asa-action";
 export const ASA_STOREFRONT_MESSAGE_ATTR = "data-asa-message";
