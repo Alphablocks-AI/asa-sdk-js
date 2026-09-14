@@ -3,6 +3,7 @@
  */
 import { waitFor } from "@testing-library/dom";
 import { AlphaBlocks } from "../alphablocks.ts";
+import { ALPHABLOCKS_HOST_Z_INDEX } from "../constants/index.ts";
 import "@testing-library/jest-dom";
 
 describe("AlphaBlocks", () => {
@@ -117,7 +118,7 @@ describe("AlphaBlocks", () => {
       expect(wrapper?.style.position).toBe("fixed");
       expect(wrapper?.style.right).toBe("24px");
       expect(wrapper?.style.bottom).toBe("24px");
-      expect(wrapper?.style.zIndex).toBe("2147480000");
+      expect(wrapper?.style.zIndex).toBe(ALPHABLOCKS_HOST_Z_INDEX);
       expect(wrapper?.style.boxShadow).toBe("");
       expect(wrapper?.style.borderRadius).toBe("");
       expect(wrapper?.querySelector(".alphablocks-frame-wrapper")).toBeNull();
