@@ -1,4 +1,8 @@
-import { ALPHABLOCKS_FRAME_WRAPPER_CLASS, ALPHABLOCKS_WRAPPER_ID } from "../constants/index.ts";
+import {
+  ALPHABLOCKS_FRAME_WRAPPER_CLASS,
+  ALPHABLOCKS_HOST_Z_INDEX,
+  ALPHABLOCKS_WRAPPER_ID,
+} from "../constants/index.ts";
 import { CustomCSSProperties } from "../types/index.ts";
 
 // Store the current position to prevent it from being overwritten by setIframeSize
@@ -169,7 +173,7 @@ export function createWrapper(): void {
   const wrapperDiv = document.createElement("div");
   wrapperDiv.setAttribute("id", ALPHABLOCKS_WRAPPER_ID);
   wrapperDiv.style.position = "fixed";
-  wrapperDiv.style.zIndex = "2147480000";
+  wrapperDiv.style.zIndex = ALPHABLOCKS_HOST_Z_INDEX;
   applyContainerOffsetPosition(wrapperDiv, currentPosition);
   wrapperDiv.style.width = "fit-content";
   wrapperDiv.style.height = "fit-content";

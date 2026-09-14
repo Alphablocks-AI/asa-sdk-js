@@ -1,4 +1,5 @@
 import {
+  ALPHABLOCKS_HOST_Z_INDEX,
   ALPHABLOCKS_WRAPPER_ID,
   ASA_STOREFRONT_ACTION_ATTR,
   ASA_STOREFRONT_MESSAGE_ATTR,
@@ -390,7 +391,7 @@ export class AlphaBlocks {
 
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 1);
-      element.style.zIndex = "2147480000";
+      element.style.zIndex = ALPHABLOCKS_HOST_Z_INDEX;
       const frameWrapper = getOrCreateFrameWrapper(element);
       frameWrapper.appendChild(iframe);
       syncFrameWrapperSize(frameWrapper, iframe);
@@ -459,7 +460,7 @@ export class AlphaBlocks {
 
     if (!iframe) {
       iframe = createIFrame(this.token, this.assistantTheme, this.assistantName, 2);
-      element.style.zIndex = "2147480000";
+      element.style.zIndex = ALPHABLOCKS_HOST_Z_INDEX;
       const frameWrapper = getOrCreateFrameWrapper(element);
       frameWrapper.appendChild(iframe);
       syncFrameWrapperSize(frameWrapper, iframe);
@@ -487,7 +488,7 @@ export class AlphaBlocks {
     onCartBridgeIframeMounted(iframe);
     installHostScrollDepthReporter(() => this.iframe);
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
-    element.style.zIndex = "2147480000";
+    element.style.zIndex = ALPHABLOCKS_HOST_Z_INDEX;
     const frameWrapper = getOrCreateFrameWrapper(element);
     frameWrapper.appendChild(iframe);
     syncFrameWrapperSize(frameWrapper, iframe);
