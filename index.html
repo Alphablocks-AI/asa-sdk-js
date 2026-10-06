@@ -3,9 +3,121 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Asa — local nudge dev</title>
+    <title>Asa — local nudge / translucent theme test</title>
     <base href="/" />
     <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        font-family: Georgia, "Times New Roman", serif;
+        color: #1a1a1a;
+        background: #f4e8d8;
+      }
+
+      /* Fake storefront — full-bleed bands so glass/opacity is obvious while scrolling */
+      .store-page {
+        width: 100%;
+        min-height: 100vh;
+      }
+
+      .store-band {
+        width: 100%;
+        padding: 4.5rem 1.5rem 5rem;
+      }
+
+      .store-band__inner {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+      }
+
+      .store-band h1,
+      .store-band h2 {
+        margin: 0 0 0.75rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        width: 100%;
+      }
+
+      .store-band h1 {
+        font-size: clamp(2rem, 5vw, 3rem);
+      }
+
+      .store-band h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+      }
+
+      .store-band p {
+        margin: 0 0 1rem;
+        font-size: 1.125rem;
+        line-height: 1.65;
+        width: 100%;
+        max-width: none;
+      }
+
+      .store-band p:last-child {
+        margin-bottom: 0;
+      }
+
+      .store-band--hero {
+        background: linear-gradient(135deg, #0253c9 0%, #1a8cff 55%, #7dd3fc 100%);
+        color: #fff;
+        padding-top: 5.5rem;
+      }
+
+      .store-band--warm {
+        background: #f97316;
+        color: #fff7ed;
+      }
+
+      .store-band--mint {
+        background: #14b8a6;
+        color: #042f2e;
+      }
+
+      .store-band--plum {
+        background: #7c3aed;
+        color: #f5f3ff;
+      }
+
+      .store-band--ink {
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+
+      .store-band--cream {
+        background: #fef3c7;
+        color: #78350f;
+      }
+
+      .store-band--rose {
+        background: #fb7185;
+        color: #4c0519;
+      }
+
+      .store-band--lime {
+        background: #a3e635;
+        color: #1a2e05;
+      }
+
+      .store-kicker {
+        display: inline-block;
+        margin-bottom: 0.75rem;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+
       #alphablocks-local-dev-toolbar {
         position: fixed;
         top: 12px;
@@ -17,6 +129,7 @@
         pointer-events: none;
         font-family: ui-sans-serif, system-ui, sans-serif;
         font-size: 12px;
+        /* Do not set max-width / overflow — SDK panel is ~320px and self-sizes */
       }
       #alphablocks-local-dev-toolbar > * {
         pointer-events: auto;
@@ -42,34 +155,41 @@
         flex-direction: column;
         gap: 8px;
       }
-      [data-asa-action] {
+
+      /* Separate from the SDK control panel — sits below it on the left */
+      .dev-actions {
         position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: aqua;
-        padding: 10px;
-        border: none;
+        top: 22rem;
+        left: 12px;
+        z-index: 2147483645;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+        width: 220px;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+
+      [data-asa-action] {
+        position: static;
+        left: auto;
+        transform: none;
+        width: 100%;
+        background-color: rgba(255, 255, 255, 0.92);
+        color: #0f172a;
+        padding: 8px 12px;
+        border: 1px solid rgba(15, 23, 42, 0.15);
+        border-radius: 8px;
         outline: none;
         cursor: pointer;
-        z-index: 2;
+        font-size: 11px;
+        font-weight: 600;
+        text-align: left;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
       }
-      [data-asa-action="btn-ask"] {
-        top: 56px;
-      }
-      [data-asa-action="btn-open"] {
-        top: 104px;
-      }
-      [data-asa-action="btn-assistant-append"] {
-        top: 152px;
-      }
-      [data-asa-action="btn-assistant-append"][data-asa-pill-questions] {
-        top: 200px;
-      }
-      [data-asa-action="btn-assistant-append"]:not([data-asa-message]):not([data-asa-pill-questions]) {
-        top: 248px;
-      }
-      [data-asa-action="btn-assistant-append"]:not([data-asa-message])[data-asa-pill-questions] {
-        top: 296px;
+
+      [data-asa-action]:hover {
+        background-color: #fff;
       }
     </style>
     <script>
@@ -95,57 +215,164 @@
       <div id="alphablocks-local-dev-panels"></div>
     </div>
 
-    <button
-      type="button"
-      data-asa-action="btn-ask"
-      data-asa-message="What are the ingredients of this product?"
-    >
-      Ask: ingredients
-    </button>
+    <div class="dev-actions" aria-label="Widget test actions">
+      <button
+        type="button"
+        data-asa-action="btn-ask"
+        data-asa-message="What are the ingredients of this product?"
+      >
+        Ask: ingredients
+      </button>
 
-    <button type="button" data-asa-action="btn-open">
-      Open chat only
-    </button>
+      <button type="button" data-asa-action="btn-open">Open chat only</button>
 
-    <button
-      type="button"
-      data-asa-action="btn-assistant-append"
-      data-asa-message="Happy to help you decide. Tap below or ask me anything."
-    >
-      Nudge + default question pills
-    </button>
+      <button
+        type="button"
+        data-asa-action="btn-assistant-append"
+        data-asa-message="Happy to help you decide. Tap below or ask me anything."
+      >
+        Nudge + default question pills
+      </button>
 
-    <button
-      type="button"
-      data-asa-action="btn-assistant-append"
-      data-asa-message="Happy to help you decide. Tap below or ask me anything."
-      data-asa-pill-questions='[
-        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
-        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
-      ]'
-    >
-      Nudge + custom question pills
-    </button>
+      <button
+        type="button"
+        data-asa-action="btn-assistant-append"
+        data-asa-message="Happy to help you decide. Tap below or ask me anything."
+        data-asa-pill-questions='[
+          {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+          {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+        ]'
+      >
+        Nudge + custom question pills
+      </button>
 
-    <button type="button" data-asa-action="btn-assistant-append">
-      Nudge + default pills (no intro attr)
-    </button>
+      <button type="button" data-asa-action="btn-assistant-append">
+        Nudge + default pills (no intro attr)
+      </button>
 
-    <button
-      type="button"
-      data-asa-action="btn-assistant-append"
-      data-asa-pill-questions='[
-        {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
-        {"label":"Sizing","userMessage":"How does sizing run for this product?"}
-      ]'
-    >
-      Nudge + custom pills (no intro attr)
-    </button>
+      <button
+        type="button"
+        data-asa-action="btn-assistant-append"
+        data-asa-pill-questions='[
+          {"label":"Ingredients?","userMessage":"What are the ingredients of this product?"},
+          {"label":"Sizing","userMessage":"How does sizing run for this product?"}
+        ]'
+      >
+        Nudge + custom pills (no intro attr)
+      </button>
+    </div>
 
-    <script src="/dist-local/index.umd.js"></script>
+    <main class="store-page" aria-label="Fake storefront for translucent theme QA">
+      <section class="store-band store-band--hero">
+        <div class="store-band__inner">
+          <span class="store-kicker">Translucent theme test page</span>
+          <h1>Scroll the store behind the widget — full width backdrop for opacity and blur QA</h1>
+          <p>
+            Full-width color bands and dense copy make opacity and backdrop blur easy to judge across the entire viewport. Open the chat pill, nudges, and panel — text and color shifts should show through glassy surfaces as you scroll left-to-right and top-to-bottom. Blue hero band with a brand-like gradient and high contrast white type gives a strong backdrop sample for frosted shells, composers, and floating brand fills at ninety percent opacity.
+          </p>
+          <p>
+            Use this page as a fake storefront: move the assistant over headings, paragraphs, and band edges. If glass feels too clear, raise TRANSLUCENT_OPACITY or TRANSLUCENT_FLOAT_OPACITY; if frost is weak inside the iframe, remember host-page blur is limited without SDK changes — still judge alpha readability against this continuous text field that stretches edge to edge without a narrow content column.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--warm">
+        <div class="store-band__inner">
+          <span class="store-kicker">Warm / orange</span>
+          <h2>Product story that should bleed through glass on every horizontal slice of the screen</h2>
+          <p>
+            Lightweight serums absorb quickly and leave skin soft without a greasy film. Pair with daily SPF and a gentle cleanser for best results across seasons, climates, and routines. Customers ask about texture, scent, refill options, and whether the formula plays nicely with retinol — keep those answers nearby while you drag the translucent panel across this warm orange field so brand-colored pills and nudges stay noticeable without going fully solid.
+          </p>
+          <p>
+            Orange backgrounds stress warm brand fills — if the pill or nudge disappears here, float opacity is too low or brand contrast fails. Scroll slowly and watch marketing sentences pass under the launcher; the glass should tint the type, not erase it, and the float surfaces at point-nine should still read as intentional chrome rather than leftover UI chrome from a white page.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--mint">
+        <div class="store-band__inner">
+          <span class="store-kicker">Mint / teal</span>
+          <h2>Ingredients customers ask about most — niacinamide through ceramides in one long readable band</h2>
+          <p>
+            Niacinamide, hyaluronic acid, ceramides, botanical oils, peptides, and vitamin C derivatives show up in almost every “what’s inside?” question from shoppers comparing SKUs. Keep this band visible under translucent shells while testing blur radius, muted borders, frosted composers, clarification rows, and FAQ chips as the mint green runs wall to wall behind the iframe.
+          </p>
+          <p>
+            Cool greens sit between light and dark themes — useful for checking muted borders and frosted composer surfaces when the open chat covers half the viewport. Drag nudges and question pills across these lines; brand fills at 0.9 opacity should still pop while the shell at lower opacity lets more of this teal story show through without turning muddy.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--plum">
+        <div class="store-band__inner">
+          <span class="store-kicker">Plum / violet</span>
+          <h2>Busy marketing copy under the chat panel — promos, returns, loyalty, and refill language</h2>
+          <p>
+            Free shipping over sixty dollars. Thirty-day returns. Refill pouches available for every hero SKU. Loyalty points double this weekend only — tap for details or ask the assistant about bundles, gift notes, subscription cadence, and whether the current promo stacks with store credit. Saturated violet makes white translucent shells obvious; dark brand pills should still read clearly at 0.9 opacity against this loud merchandising strip.
+          </p>
+          <p>
+            Keep the widget open and scroll so promo sentences slide under the header, transcript, and composer. If you lose the sense of a frosted card, bump blur or float opacity; if the panel feels like a solid sticker, lower TRANSLUCENT_OPACITY until the plum copy remains legible through the glass across the full width of the band.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--cream">
+        <div class="store-band__inner">
+          <span class="store-kicker">Cream / low contrast</span>
+          <h2>Light store pages are the hard case — pale Shopify themes where white glass can vanish</h2>
+          <p>
+            Many Shopify themes stay pale: soft cream, beige, sand, and off-white with brown body copy. Translucent white glass can vanish here unless float surfaces stay stronger than the open chat panel. Use every horizontal inch of this cream field to confirm the launcher and nudges remain noticeable without going fully opaque, especially when brand color is light or desaturated.
+          </p>
+          <p>
+            Walk the pill along the bottom edge while cream text scrolls behind it. Low-contrast stores are where translucent themes usually fail first — if you cannot spot the assistant within a second, raise TRANSLUCENT_FLOAT_OPACITY or keep brand fills closer to solid for discovery surfaces while leaving the chat shell more open.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--ink">
+        <div class="store-band__inner">
+          <span class="store-kicker">Ink / near-black</span>
+          <h2>Dark storefront stress test — night-mode merch pages that hide dark brand colors</h2>
+          <p>
+            Night-mode product pages and dark merch sites hide dark brand colors and can swallow navy or charcoal pills. Glass should still frost the light type underneath when you scroll the chat or nudge over this ink section, from the left padding edge all the way to the right. Look for readable frosted edges, not a muddy smear against slate paragraphs that span the full width.
+          </p>
+          <p>
+            If blur is too strong, reduce TRANSLUCENT_BACKDROP_BLUR_PX; if contrast fails, raise TRANSLUCENT_FLOAT_OPACITY. Repeat with the chat open and closed so you compare shell glass versus float glass on the same dark runway of copy stretching across one hundred percent of the viewport.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--rose">
+        <div class="store-band__inner">
+          <span class="store-kicker">Rose / pink</span>
+          <h2>More scroll runway for motion QA — long product marketing lines without leaving this page</h2>
+          <p>
+            Open chat, product nudges, and scroll on most viewports — long lines of product marketing copy continue so you can drag the widget over shifting hues without leaving this page. Keep scrolling past sizing notes, ingredient callouts, shipping promises, and social proof fragments that wrap naturally across the full width instead of sitting in a constrained reading column.
+          </p>
+          <p>
+            Each band is full viewport width so nothing sits in a narrow card or padded column that hides the effect. Use rose as a mid-energy check: loud enough to see through glass, soft enough that over-blur looks obvious when the frosted panel turns the copy into an unreadable pink fog.
+          </p>
+        </div>
+      </section>
+
+      <section class="store-band store-band--lime">
+        <div class="store-band__inner">
+          <span class="store-kicker">Lime / high energy</span>
+          <h2>End of page — last contrast check on a neon-adjacent storefront strip</h2>
+          <p>
+            Neon-adjacent lime is intentionally loud. If translucent chrome still looks intentional here, opacity and blur are in a workable range for noisy store themes with big headlines and dense body text that fills the horizontal space. Reload after tweaking TRANSLUCENT_OPACITY, TRANSLUCENT_FLOAT_OPACITY, or TRANSLUCENT_BACKDROP_BLUR_PX in the widget-theme preset, then scroll this final band under the pill, nudges, and open assistant once more.
+          </p>
+          <p>
+            When you are done, the goal is simple: glass that feels premium on scroll without losing discoverability — full-width type behind every surface so regressions are obvious the moment something goes too clear or too opaque.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/asa-sdk-js/dist-local/index.umd.js"></script>
     <script>
       const alphablocksAssistant = new AlphaBlocks({
-        token: "pk_vEcWUJJ8L73CTu2EriYEVApLeHviq",
+        token: "pk_dAZJrBSOxmMW23ShZ7iBVnm0utrzv", //sushant
+        // token: "pk_KVQ9j1Fd6kXjt2uG5dHFNqelmLc3H", //aakash
       });
       alphablocksAssistant.renderWrapper();
       alphablocksAssistant.showAssistant();
