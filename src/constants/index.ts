@@ -41,10 +41,12 @@ export const NUDGE_DEV_ENABLED = (() => {
 export const EMBED_MOBILE_MAX_INNER_WIDTH_PX = 500;
 
 /**
- * Desktop floating chat shell width.
+ * Desktop floating chat shell width (collapsed).
  *
  * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellWidthPx` in
  * `Asa-MonoRepo/packages/widget-theme/src/chat-layout.ts`.
+ * Expanded open-chat width is sent via postMessage (`clamp(320px, 900px, 90dvw)`);
+ * the host applies that string on the iframe — do not hardcode expanded px here.
  */
 export const CHAT_IFRAME_WIDTH_PX = 480;
 

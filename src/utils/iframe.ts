@@ -74,7 +74,7 @@ function isFullBleedMobileLayout(properties: EventDataType): boolean {
   return Boolean(properties.right) && Boolean(properties.left) && Boolean(properties.bottom);
 }
 
-/** Apply a CSS size; fall back to `vh` when `dvh` is rejected (older engines / jsdom). */
+/** Apply a CSS size; fall back to `vh`/`vw` when `dvh`/`dvw` is rejected (older engines / jsdom). */
 function setElementStyleDimension(
   el: HTMLElement,
   dimension: "width" | "height",
@@ -84,15 +84,16 @@ function setElementStyleDimension(
   const applied = el.style.getPropertyValue(dimension);
   if (applied === value) return;
 
-  if (value.endsWith("dvh")) {
-    const vhFallback = value.replace(/dvh$/, "vh");
+  // Plain `100dvh` / `90dvw`, or values like `clamp(..., 90dvw)` / `min(..., 100dvh)`.
+  if (value.includes("dvh")) {
+    const vhFallback = value.replaceAll("dvh", "vh");
     if (applied !== vhFallback) {
       el.style.setProperty(dimension, vhFallback);
     }
     return;
   }
-  if (value.endsWith("dvw")) {
-    const vwFallback = value.replace(/dvw$/, "vw");
+  if (value.includes("dvw")) {
+    const vwFallback = value.replaceAll("dvw", "vw");
     if (applied !== vwFallback) {
       el.style.setProperty(dimension, vwFallback);
     }
