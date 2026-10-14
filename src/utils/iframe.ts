@@ -86,14 +86,14 @@ function setElementStyleDimension(
 
   // Plain `100dvh` / `90dvw`, or values like `clamp(..., 90dvw)` / `min(..., 100dvh)`.
   if (value.includes("dvh")) {
-    const vhFallback = value.replaceAll("dvh", "vh");
+    const vhFallback = value.replace(/dvh/g, "vh");
     if (applied !== vhFallback) {
       el.style.setProperty(dimension, vhFallback);
     }
     return;
   }
   if (value.includes("dvw")) {
-    const vwFallback = value.replaceAll("dvw", "vw");
+    const vwFallback = value.replace(/dvw/g, "vw");
     if (applied !== vwFallback) {
       el.style.setProperty(dimension, vwFallback);
     }
