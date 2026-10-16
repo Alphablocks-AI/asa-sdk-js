@@ -45,24 +45,24 @@ export const EMBED_MOBILE_MAX_INNER_WIDTH_PX = 500;
  *
  * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellWidthPx` in
  * `Asa-MonoRepo/packages/widget-theme/src/chat-layout.ts`.
+ * Expanded open-chat size is sent via postMessage (`min(850px, 90dvw)` ×
+ * `min(650px, calc(100dvh - edge))`); the host applies those strings on the iframe.
  */
-export const CHAT_IFRAME_WIDTH_PX = 480;
+export const CHAT_IFRAME_WIDTH_PX = 500;
 
 /**
- * Minimum desktop chat shell height when the viewport is short.
+ * Desktop floating chat shell height (collapsed).
  *
- * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellMinHeightPx` in
- * `Asa-MonoRepo/packages/widget-theme/src/chat-layout.ts`.
+ * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellHeightPx`.
  */
-export const CHAT_IFRAME_MIN_HEIGHT_PX = 575;
+export const CHAT_IFRAME_MIN_HEIGHT_PX = 500;
 
 /**
- * Maximum desktop chat shell height on tall viewports.
+ * Collapsed desktop chat shell max height (same as min for fixed 500×500 default).
  *
- * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellMaxHeightPx` in
- * `Asa-MonoRepo/packages/widget-theme/src/chat-layout.ts`.
+ * **Monorepo sync:** keep in sync with `WIDGET_CHAT_LAYOUT.shellMaxHeightPx`.
  */
-export const CHAT_IFRAME_MAX_HEIGHT_PX = 720;
+export const CHAT_IFRAME_MAX_HEIGHT_PX = 500;
 
 /**
  * Host viewport inset — chat iframe bottom margin + wrapper corner offset.
@@ -73,5 +73,5 @@ export const CHAT_IFRAME_MAX_HEIGHT_PX = 720;
  */
 export const CHAT_IFRAME_EDGE_MARGIN_PX = 24;
 
-/** Desktop chat iframe height — viewport minus bottom margin, clamped to min/max. */
-export const CHAT_IFRAME_VIEWPORT_HEIGHT = `min(${CHAT_IFRAME_MAX_HEIGHT_PX}px, max(${CHAT_IFRAME_MIN_HEIGHT_PX}px, calc(100dvh - ${CHAT_IFRAME_EDGE_MARGIN_PX}px)))`;
+/** Desktop chat iframe height — fixed collapsed size, never taller than the viewport. */
+export const CHAT_IFRAME_VIEWPORT_HEIGHT = `min(${CHAT_IFRAME_MAX_HEIGHT_PX}px, calc(100dvh - ${CHAT_IFRAME_EDGE_MARGIN_PX}px))`;
