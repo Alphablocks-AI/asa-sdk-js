@@ -240,6 +240,7 @@ export function sendParentUrlParams(
   url.searchParams.delete("query");
   const urlPath = `${url.pathname}${url.search}`;
   window.history.replaceState({}, document.title, url.toString());
+  const referrer = typeof document !== "undefined" && document.referrer ? document.referrer : "";
   const message = {
     type: "alphablocks-parent-url",
     data: {
@@ -250,6 +251,7 @@ export function sendParentUrlParams(
       params,
       sessionCookie,
       hostname: window.location.hostname,
+      ...(referrer ? { referrer } : {}),
     },
   };
   if (!iframe || !iframe.contentWindow) return;
@@ -263,12 +265,15 @@ function buildStorefrontParentMessageData(): {
   urlPath: string;
   searchQuery: string;
   hostname: string;
+  referrer?: string;
 } {
   const url = new URL(window.location.href);
+  const referrer = typeof document !== "undefined" && document.referrer ? document.referrer : "";
   return {
     urlPath: `${url.pathname}${url.search}`,
     searchQuery: url.searchParams.get("q") || "",
     hostname: window.location.hostname,
+    ...(referrer ? { referrer } : {}),
   };
 }
 
