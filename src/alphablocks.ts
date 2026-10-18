@@ -87,6 +87,8 @@ export class AlphaBlocks {
   public endUserId: string = "";
   public sessionId: string = "";
   public userId: string = "";
+  public userFirstName: string = "";
+  public userOrdersCount: number | null = null;
   public isActive: boolean = true;
 
   constructor(props: AlphaBlocksConstructor) {
@@ -106,6 +108,11 @@ export class AlphaBlocks {
     this.assistantId = props.id || null;
     this.endUserId = props.endUserId || "";
     this.userId = props.userId || "";
+    this.userFirstName = props.userFirstName?.trim() || "";
+    this.userOrdersCount =
+      typeof props.userOrdersCount === "number" && Number.isFinite(props.userOrdersCount)
+        ? Math.floor(props.userOrdersCount)
+        : null;
 
     window.addEventListener("message", (event) => {
       this.handleEvents(event.data.type, event.data.data);
@@ -236,6 +243,8 @@ export class AlphaBlocks {
         sessionCookie: resolvedEndUserId,
         cookieIsExisted: isExisted,
         userId: this.userId,
+        userFirstName: this.userFirstName || undefined,
+        userOrdersCount: this.userOrdersCount === null ? undefined : this.userOrdersCount,
         preferredSessionId,
       },
       this.iframe,
@@ -293,8 +302,7 @@ export class AlphaBlocks {
   private handleCartUpdates(event: string, data: EventDataType): void {
     const incomingSessionId = (data.sessionId ?? "").trim();
     const isAttrWrite =
-      event === "alphablocks-set-cart-attributes" ||
-      event === "alphablocks-add-product-to-cart";
+      event === "alphablocks-set-cart-attributes" || event === "alphablocks-add-product-to-cart";
 
     if (isAttrWrite && incomingSessionId) {
       this.sessionId = incomingSessionId;
@@ -334,13 +342,10 @@ export class AlphaBlocks {
           await handleSetCartAttributes(identity, refreshIdentity);
         }
         if (event === "alphablocks-add-product-to-cart") {
-          await handleAddProductToCart(
-            data.variantId,
-            data.quantity,
-            this.iframe,
-            identity,
-            { sourceNote: data.sourceNote, refreshIdentity },
-          );
+          await handleAddProductToCart(data.variantId, data.quantity, this.iframe, identity, {
+            sourceNote: data.sourceNote,
+            refreshIdentity,
+          });
         }
       } catch (err) {
         console.error("[ASA] cartUpdateQueue error:", err);

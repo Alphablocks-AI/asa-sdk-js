@@ -145,6 +145,31 @@
     return undefined;
   }
 
+  function attrFromLoader(name) {
+    if (typeof document === "undefined") return null;
+    if (document.currentScript) {
+      const v = document.currentScript.getAttribute(name);
+      if (v && v.trim()) return v.trim();
+    }
+    const scripts = document.querySelectorAll(LOADER_SCRIPT_SELECTOR);
+    for (let i = 0; i < scripts.length; i++) {
+      const v = scripts[i].getAttribute(name);
+      if (v && v.trim()) return v.trim();
+    }
+    return null;
+  }
+
+  function getUserFirstName() {
+    return attrFromLoader("data-user-first-name");
+  }
+
+  function getUserOrdersCount() {
+    const raw = attrFromLoader("data-user-orders-count");
+    if (raw == null) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
+  }
+
   /**
    * Initialize and show the widget
    */
@@ -161,6 +186,10 @@
     try {
       const props = { token: token };
       if (userId) props.userId = userId;
+      const firstName = getUserFirstName();
+      if (firstName) props.userFirstName = firstName;
+      const ordersCount = getUserOrdersCount();
+      if (ordersCount !== undefined) props.userOrdersCount = ordersCount;
       const assistant = new window.AlphaBlocks(props);
       assistant.renderWrapper();
       await assistant.showAssistant();

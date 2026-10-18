@@ -22,6 +22,10 @@ export interface AlphaBlocksConstructor {
   id?: number | null;
   endUserId?: string;
   userId?: string;
+  /** Shopify Liquid `customer.first_name` from App Embed (optional). */
+  userFirstName?: string;
+  /** Shopify Liquid `customer.orders_count` from App Embed (optional). */
+  userOrdersCount?: number;
 }
 
 export interface EventDataType {
