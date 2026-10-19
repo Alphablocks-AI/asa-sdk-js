@@ -1,13 +1,17 @@
-import { addToCart, getCart, getProductByHandle, getSearchProductsCount } from "./api.ts";
 import {
-  syncCartAttributes,
-  type CartAttributeIdentity,
-} from "./cart-attributes.ts";
+  addToCart,
+  getCart,
+  getProductByHandle,
+  getProductRecommendations,
+  getSearchProductsCount,
+} from "./api.ts";
+import { syncCartAttributes, type CartAttributeIdentity } from "./cart-attributes.ts";
 
 const CART_DETAILS_RESPONSE = "alphablocks-get-cart-details-response";
 const ADD_PRODUCT_TO_CART_RESPONSE = "alphablocks-add-product-to-cart-response";
 const SEARCH_PRODUCTS_RESPONSE = "alphablocks-check-search-products-response";
 const PRODUCT_BY_HANDLE_RESPONSE = "alphablocks-get-product-by-handle-response";
+const PRODUCT_RECOMMENDATIONS_RESPONSE = "alphablocks-get-product-recommendations-response";
 
 // 🔹 0. Refresh cart UI
 export async function refreshCartUI(): Promise<void> {
@@ -218,6 +222,52 @@ export async function handleGetProductByHandle(
           success: false,
           handle: normalizedHandle,
           product: null,
+          error: (err as Error).message || String(err),
+        },
+      },
+      "*",
+    );
+  }
+}
+
+export async function handleGetProductRecommendations(
+  productId: string,
+  intent: string,
+  iframe: HTMLIFrameElement | null,
+  limit?: number,
+): Promise<void> {
+  if (!iframe?.contentWindow) return;
+
+  const normalizedId = productId.trim();
+  const normalizedIntent = intent === "complementary" ? "complementary" : "related";
+
+  try {
+    const products = await getProductRecommendations({
+      productId: normalizedId,
+      intent: normalizedIntent,
+      limit,
+    });
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_RECOMMENDATIONS_RESPONSE,
+        data: {
+          success: true,
+          productId: normalizedId,
+          intent: normalizedIntent,
+          products,
+        },
+      },
+      "*",
+    );
+  } catch (err) {
+    iframe.contentWindow.postMessage(
+      {
+        type: PRODUCT_RECOMMENDATIONS_RESPONSE,
+        data: {
+          success: false,
+          productId: normalizedId,
+          intent: normalizedIntent,
+          products: [],
           error: (err as Error).message || String(err),
         },
       },

@@ -144,3 +144,98 @@ export async function getProductByHandle(handle: string): Promise<{
   if (!res.ok) return null;
   return res.json();
 }
+
+export type StorefrontRecommendationPreview = {
+  id: string;
+  title: string;
+  imageUrl?: string | null;
+  onlineStoreUrl?: string | null;
+  priceDisplay?: string | null;
+  variantId?: string | null;
+};
+
+function numericProductId(productId: string): string | null {
+  const raw = productId.trim();
+  if (!raw) return null;
+  const fromGid = raw.match(/\/Product\/(\d+)/i);
+  if (fromGid?.[1]) return fromGid[1];
+  if (/^\d+$/.test(raw)) return raw;
+  return null;
+}
+
+/** Shopify Ajax Product Recommendations — same source BE uses first. */
+export async function getProductRecommendations(params: {
+  productId: string;
+  intent: "related" | "complementary";
+  limit?: number;
+}): Promise<StorefrontRecommendationPreview[]> {
+  const productId = numericProductId(params.productId);
+  if (!productId) return [];
+
+  const root = (
+    (window as Window & { Shopify?: { routes?: { root?: string } } }).Shopify?.routes?.root || "/"
+  ).replace(/\/?$/, "/");
+
+  const qs = new URLSearchParams({
+    product_id: productId,
+    intent: params.intent,
+    limit: String(Math.min(Math.max(params.limit ?? 4, 1), 10)),
+  });
+
+  const res = await fetch(`${root}recommendations/products.json?${qs}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  const products = Array.isArray(data?.products) ? data.products : [];
+
+  return products
+    .map((p: Record<string, unknown>): StorefrontRecommendationPreview | null => {
+      const title = typeof p.title === "string" ? p.title.trim() : "";
+      if (!title) return null;
+      const id = p.id != null ? String(p.id) : "";
+      if (!id) return null;
+
+      const featured = p.featured_image;
+      let imageUrl: string | null = null;
+      if (typeof featured === "string") imageUrl = featured;
+      else if (featured && typeof featured === "object") {
+        const img = featured as { url?: string; src?: string };
+        imageUrl = img.url || img.src || null;
+      }
+
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      const firstVariant = variants[0] as { id?: number | string } | undefined;
+      const variantId = firstVariant?.id != null ? String(firstVariant.id) : null;
+
+      const priceRaw = p.price;
+      let priceDisplay: string | null = null;
+      if (typeof priceRaw === "number") {
+        priceDisplay = `$${(priceRaw / 100).toFixed(2)}`;
+      } else if (typeof priceRaw === "string" && priceRaw.trim()) {
+        const n = Number(priceRaw);
+        priceDisplay = Number.isFinite(n) ? `$${(n / 100).toFixed(2)}` : priceRaw;
+      }
+
+      const url =
+        typeof p.url === "string"
+          ? p.url
+          : typeof p.handle === "string"
+            ? `/products/${p.handle}`
+            : null;
+
+      return {
+        id,
+        title,
+        imageUrl,
+        onlineStoreUrl: url,
+        priceDisplay,
+        variantId,
+      };
+    })
+    .filter(
+      (row: StorefrontRecommendationPreview | null): row is StorefrontRecommendationPreview =>
+        row != null,
+    );
+}

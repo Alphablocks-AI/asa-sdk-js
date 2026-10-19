@@ -55,6 +55,11 @@ export interface EventDataType {
   query?: string;
   searchQuery?: string;
   handle?: string;
+  /** Shopify product id (numeric or GID) for recommendations Ajax. */
+  productId?: string;
+  /** Shopify recommendations intent: `related` | `complementary`. */
+  intent?: string;
+  limit?: number;
   hasProducts?: boolean;
   productCount?: number;
   success?: boolean;
@@ -65,6 +70,15 @@ export interface EventDataType {
     handle?: string;
     price?: number;
   } | null;
+  /** Slim rows from `/recommendations/products.json`. */
+  products?: Array<{
+    id: string;
+    title: string;
+    imageUrl?: string | null;
+    onlineStoreUrl?: string | null;
+    priceDisplay?: string | null;
+    variantId?: string | null;
+  }>;
 }
 
 export interface CustomCSSProperties {

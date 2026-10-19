@@ -26,6 +26,7 @@ import {
   handleCheckSearchProducts,
   handleGetCartDetails,
   handleGetProductByHandle,
+  handleGetProductRecommendations,
   handleSetCartAttributes,
 } from "./utils/event-handler.ts";
 import {
@@ -178,6 +179,9 @@ export class AlphaBlocks {
       case "alphablocks-get-product-by-handle":
         this.handleCartUpdates("alphablocks-get-product-by-handle", data);
         break;
+      case "alphablocks-get-product-recommendations":
+        this.handleCartUpdates("alphablocks-get-product-recommendations", data);
+        break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
         this.iframe.style.display = "block";
@@ -319,6 +323,15 @@ export class AlphaBlocks {
     }
     if (event === "alphablocks-get-product-by-handle") {
       void handleGetProductByHandle(data.handle || "", this.iframe);
+      return;
+    }
+    if (event === "alphablocks-get-product-recommendations") {
+      void handleGetProductRecommendations(
+        data.productId || "",
+        data.intent || "related",
+        this.iframe,
+        data.limit,
+      );
       return;
     }
 
