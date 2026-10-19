@@ -34,6 +34,10 @@ const FIXTURE_OPTIONS = [
   },
   { id: "product_compare", label: "Product viewed — compare two products" },
   { id: "search_submitted", label: "Search — results nudge" },
+  {
+    id: "search_no_results",
+    label: "Search — no results float (click-to-chat)",
+  },
   { id: "cart_added_discount", label: "Cart added — discount progress only" },
   { id: "cart_added_carousel", label: "Cart added — pairing carousel only" },
   {
