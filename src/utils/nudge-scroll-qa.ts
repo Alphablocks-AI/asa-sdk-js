@@ -12,7 +12,11 @@ export const SCROLL_QA_PDP_PATHS = [
   "/products/hydrating-cream-cleanser",
 ] as const;
 
-/** Run from index.html head before the SDK bundle (Live Server PDP stubs). */
+/**
+ * Soft-restore a PDP path onto `/` after an optional `?scroll-qa-path=` entry.
+ * Used by index.html only. Product stubs under `products/` must NOT `location.replace`
+ * back here — that bounced with Live Server hard reloads into a loop.
+ */
 export function restoreScrollQaPathFromRedirect(): void {
   const params = new URLSearchParams(location.search);
   const fromQuery = params.get("scroll-qa-path");
@@ -22,6 +26,7 @@ export function restoreScrollQaPathFromRedirect(): void {
   const path = location.pathname || "/";
   if (path !== "/" && path !== "/index.html") return;
   sessionStorage.removeItem(SCROLL_QA_PATH_KEY);
+  // Soft URL only — keeps document as index.html so Live Server does not re-fetch products/*.html.
   history.replaceState(null, "", target);
 }
 
@@ -84,6 +89,8 @@ function paintScrollMeter(meter: HTMLElement): void {
 
 function navigateScrollQaPath(path: string, getAssistant: () => ScrollQaAssistant | null): void {
   if (!path.startsWith("/") || path.includes("..")) return;
+  // Soft navigation only. Hard reload of /products/* is handled by products/*.html
+  // loading index.html in place (no location.replace) so Live Server cannot loop.
   history.pushState(null, "", path);
   const assistant = getAssistant();
   assistant?.syncParentUrlToWidget();

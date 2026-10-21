@@ -2,16 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Asa — local nudge PDP</title>
+    <!--
+      Live Server serves this file on a hard reload of /products/hydrating-cream-cleanser.
+      Do NOT location.replace to /?scroll-qa-path=… — that + index.html replaceState
+      caused a hard-reload loop (stub → index → /products/… → stub) every few seconds.
+      Load the host page in place so the address bar stays a real PDP path for scroll QA.
+    -->
     <script>
-      sessionStorage.setItem(
-        "alphablocks-scroll-qa-path",
-        "/products/hydrating-cream-cleanser",
-      );
-      location.replace(
-        location.origin +
-          "/?scroll-qa-path=" +
-          encodeURIComponent("/products/hydrating-cream-cleanser"),
-      );
+      (async function () {
+        try {
+          var res = await fetch("/index.html", { cache: "reload" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var html = await res.text();
+          document.open();
+          document.write(html);
+          document.close();
+        } catch (err) {
+          document.body.textContent =
+            "Failed to load host page for PDP scroll QA. Open / instead.";
+          console.error("[asa-sdk] PDP scroll QA host load failed:", err);
+        }
+      })();
     </script>
   </head>
   <body>

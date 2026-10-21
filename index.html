@@ -75,6 +75,8 @@
       }
     </style>
     <script>
+      // Soft-restore PDP path for scroll QA. products/*.html must not location.replace
+      // back to this page — that caused a Live Server hard-reload loop.
       (function () {
         var key = "alphablocks-scroll-qa-path";
         var params = new URLSearchParams(location.search);
