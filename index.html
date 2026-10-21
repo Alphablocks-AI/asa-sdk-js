@@ -5,6 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asa — local nudge dev</title>
     <base href="/" />
+    <!--
+      Block Live Server's reload WebSocket on this host page only.
+      Must be in <head> before Live Server injects its client at </body>.
+      Widget HMR on :3002 is unaffected (different host/port, inside the iframe).
+    -->
+    <script>
+      (function () {
+        var NativeWebSocket = window.WebSocket;
+        if (!NativeWebSocket) return;
+        function WrappedWebSocket(url, protocols) {
+          var href = String(url);
+          // Live Server talks to the same host:port as the page (e.g. ws://127.0.0.1:5500/...)
+          var sameHost =
+            href.indexOf("://" + location.host) !== -1 ||
+            href.indexOf("://" + location.hostname + ":" + location.port) !== -1;
+          if (sameHost) {
+            console.info("[asa-sdk] blocked Live Server reload WebSocket:", href);
+            return {
+              readyState: 3,
+              close: function () {},
+              send: function () {},
+              addEventListener: function () {},
+              removeEventListener: function () {},
+            };
+          }
+          return protocols === undefined
+            ? new NativeWebSocket(url)
+            : new NativeWebSocket(url, protocols);
+        }
+        WrappedWebSocket.prototype = NativeWebSocket.prototype;
+        WrappedWebSocket.CONNECTING = NativeWebSocket.CONNECTING;
+        WrappedWebSocket.OPEN = NativeWebSocket.OPEN;
+        WrappedWebSocket.CLOSING = NativeWebSocket.CLOSING;
+        WrappedWebSocket.CLOSED = NativeWebSocket.CLOSED;
+        window.WebSocket = WrappedWebSocket;
+      })();
+    </script>
     <style>
       #alphablocks-local-dev-toolbar {
         position: fixed;
