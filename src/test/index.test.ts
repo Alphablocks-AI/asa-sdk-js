@@ -241,9 +241,11 @@ describe("AlphaBlocks", () => {
     test("should handle hide iframe event", async () => {
       const iframe = document.querySelector("iframe");
       const chatIcon = document.getElementById("alphablocks-chat-icon-container");
+      const wrapper = document.getElementById("alphablocks-assistant-container");
       window.postMessage({ type: "alphablocks-hide-iframe", data: {} }, "*");
       await waitFor(() => {
         expect(iframe?.style.display).toBe("none");
+        expect(wrapper?.style.display).toBe("none");
         expect(chatIcon?.style.display).toBe("block");
       });
     });

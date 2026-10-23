@@ -109,6 +109,17 @@ function shouldRevealHostFrame(properties: EventDataType): boolean {
   return Boolean(properties.frameBorderRadius);
 }
 
+function setHostContainerDisplay(display: string): void {
+  const container = document.getElementById(ALPHABLOCKS_WRAPPER_ID);
+  if (container) {
+    container.style.display = display;
+  }
+}
+
+export function showHostContainer(): void {
+  setHostContainerDisplay("");
+}
+
 export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameElement | null): void {
   if (!iframe) return;
 
@@ -122,6 +133,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
   if (!properties.height || !properties.width) {
     if (shouldRevealHostFrame(properties)) {
       revealFrameWrapper(frameWrapper);
+      showHostContainer();
     }
     return;
   }
@@ -204,6 +216,7 @@ export function setIframeSize(properties: EventDataType, iframe: HTMLIFrameEleme
 
   if (shouldRevealHostFrame(properties)) {
     revealFrameWrapper(frameWrapper);
+    showHostContainer();
     iframe.style.display = "block";
   }
 }
@@ -220,6 +233,7 @@ export function sendOriginalWindowMessage(iframe: HTMLIFrameElement | null): voi
 export function hideIframe(iframe: HTMLIFrameElement | null): void {
   if (!iframe) return;
   iframe.style.display = "none";
+  setHostContainerDisplay("none");
   const chatIconContainer = document.getElementById("alphablocks-chat-icon-container");
   if (chatIconContainer) {
     chatIconContainer.style.display = "block";

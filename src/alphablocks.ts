@@ -36,6 +36,7 @@ import {
   sendParentUrlParams,
   setIframeAccessibleTitle,
   setIframeSize,
+  showHostContainer,
   sendStorefrontAction,
   type StorefrontAction,
 } from "./utils/iframe.ts";
@@ -173,6 +174,7 @@ export class AlphaBlocks {
         break;
       case "alphablocks-nudge-render":
         if (!this.iframe) return;
+        showHostContainer();
         this.iframe.style.display = "block";
         try {
           const container = getElement(ALPHABLOCKS_WRAPPER_ID);
@@ -293,8 +295,7 @@ export class AlphaBlocks {
   private handleCartUpdates(event: string, data: EventDataType): void {
     const incomingSessionId = (data.sessionId ?? "").trim();
     const isAttrWrite =
-      event === "alphablocks-set-cart-attributes" ||
-      event === "alphablocks-add-product-to-cart";
+      event === "alphablocks-set-cart-attributes" || event === "alphablocks-add-product-to-cart";
 
     if (isAttrWrite && incomingSessionId) {
       this.sessionId = incomingSessionId;
@@ -334,13 +335,10 @@ export class AlphaBlocks {
           await handleSetCartAttributes(identity, refreshIdentity);
         }
         if (event === "alphablocks-add-product-to-cart") {
-          await handleAddProductToCart(
-            data.variantId,
-            data.quantity,
-            this.iframe,
-            identity,
-            { sourceNote: data.sourceNote, refreshIdentity },
-          );
+          await handleAddProductToCart(data.variantId, data.quantity, this.iframe, identity, {
+            sourceNote: data.sourceNote,
+            refreshIdentity,
+          });
         }
       } catch (err) {
         console.error("[ASA] cartUpdateQueue error:", err);
@@ -379,6 +377,7 @@ export class AlphaBlocks {
       chatIconContainer.style.display = "none";
     }
     if (this.iframe) {
+      showHostContainer();
       this.iframe.style.display = "block";
     }
   }
@@ -387,6 +386,7 @@ export class AlphaBlocks {
     if (this.hydratePromise) await this.hydratePromise;
     if (!this.isActive) return;
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
+    showHostContainer();
     let iframe = element.querySelector("iframe");
 
     if (!iframe) {
@@ -456,6 +456,7 @@ export class AlphaBlocks {
 
   public async showAssistantOnBtnClick(): Promise<void> {
     const element = getElement(ALPHABLOCKS_WRAPPER_ID);
+    showHostContainer();
     let iframe = element.querySelector("iframe");
 
     if (!iframe) {
